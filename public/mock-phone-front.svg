@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="760" viewBox="0 0 600 760" fill="none">
+  <defs>
+    <linearGradient id="frame" x1="145" y1="52" x2="458" y2="708" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D8DCE5"/>
+      <stop offset=".5" stop-color="#727987"/>
+      <stop offset="1" stop-color="#D5D8DE"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="165" y1="75" x2="438" y2="683" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10264B"/>
+      <stop offset=".5" stop-color="#5266CC"/>
+      <stop offset="1" stop-color="#F087A4"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="matrix(212 250 -230 195 224 254)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#80D8F7"/>
+      <stop offset="1" stop-color="#8062DB" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="300" cy="700" rx="150" ry="22" fill="#172033" fill-opacity=".12"/>
+  <rect x="134" y="48" width="332" height="664" rx="56" fill="url(#frame)"/>
+  <rect x="144" y="58" width="312" height="644" rx="48" fill="#11151E"/>
+  <rect x="155" y="70" width="290" height="620" rx="40" fill="url(#screen)"/>
+  <rect x="155" y="70" width="290" height="620" rx="40" fill="url(#glow)"/>
+  <path d="M155 496c63-103 108-145 170-139 45 4 80 38 120 30v263c0 22-18 40-40 40H195c-22 0-40-18-40-40V496Z" fill="#FFB2C7" fill-opacity=".45"/>
+  <path d="M155 550c62-72 104-102 157-85 53 17 81 59 133 38v147c0 22-18 40-40 40H195c-22 0-40-18-40-40V550Z" fill="#243E78" fill-opacity=".7"/>
+  <rect x="248" y="79" width="104" height="27" rx="14" fill="#090B11"/>
+  <circle cx="336" cy="92" r="5" fill="#242B3B"/>
+</svg>
