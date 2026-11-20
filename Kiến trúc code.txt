@@ -1,0 +1,61 @@
+Bạn đang phát triển TechStore.FE, ứng dụng React + TypeScript dùng feature-based architecture.
+
+Hãy triển khai yêu cầu: [MÔ TẢ TÍNH NĂNG]
+
+Trước khi sửa:
+1. Khảo sát cấu trúc và code liên quan trong src/; tìm service, component, route hoặc kiểu dữ liệu có thể tái sử dụng.
+2. Đọc các thay đổi đang có trong worktree và bảo toàn chúng.
+3. Nêu ngắn gọn các file dự kiến sửa, rồi triển khai trực tiếp.
+
+Quy ước cấu trúc:
+
+src/
+├── App.tsx
+├── features/
+│   ├── storefront/
+│   │   ├── auth/
+│   │   ├── catalog/
+│   │   ├── cart/
+│   │   ├── checkout/
+│   │   ├── orders/
+│   │   ├── profile/
+│   │   └── shipments/
+│   └── admin/
+│       ├── catalog/
+│       ├── inventory/
+│       ├── orders/
+│       ├── payments/
+│       └── shipments/
+├── routes/
+│   ├── AppRouter.tsx
+│   ├── publicRoutes.tsx
+│   ├── clientRoutes.tsx
+│   ├── adminRoutes.tsx
+│   └── AdminPageChunks.tsx
+├── shared/
+│   ├── api/
+│   │   ├── httpClient.ts
+│   │   ├── serviceMode.ts
+│   │   ├── dto/
+│   │   └── endpoints/
+│   ├── components/
+│   └── layouts/
+├── services/       # Các compatibility exports/demo service cũ
+├── mocks/
+├── hooks/
+├── store/
+├── types/
+└── utils/
+
+Nguyên tắc:
+- Đặt code mới trong feature sở hữu nghiệp vụ đó; tên thư mục feature dùng chữ thường, tên React component dùng PascalCase.
+- Page của feature đặt trong thư mục feature tương ứng; component, hook, type hoặc helper chỉ dùng riêng cho feature thì đặt cạnh feature đó.
+- Chỉ đưa code vào shared/ khi thực sự được nhiều feature dùng và không phụ thuộc nghiệp vụ riêng.
+- Không import trực tiếp file nội bộ của feature khác. Nếu cần chia sẻ, tạo public export phù hợp hoặc chuyển phần dùng chung vào shared/.
+- Route mới phải đặt trong nhóm public, client hoặc admin phù hợp; giữ URL và lazy loading của Admin. Không thay đổi chính sách đăng nhập/guest nếu yêu cầu không nêu rõ.
+- Axios client dùng shared/api/httpClient.ts. API endpoint đặt trong shared/api/endpoints/, request/response contract đặt trong shared/api/dto/. Không tạo Axios client hoặc kiểu DTO trùng lặp.
+- Demo/mock service phải giữ type-safe và tách khỏi API thật. Tôn trọng VITE_SERVICE_MODE và hành vi guest/demo hiện tại; không âm thầm đổi sang API thật hoặc ngược lại.
+- Giữ nguyên nghiệp vụ, UX, giao diện và TypeScript type safety. Không đổi tên URL, dữ liệu hay luồng xác thực ngoài phạm vi yêu cầu.
+- Thay đổi tối thiểu, không tạo thư mục/file rỗng hay abstraction không cần thiết. Cập nhật trực tiếp các import và route liên quan.
+- Cập nhật README kiến trúc nếu thay đổi quy ước cấu trúc.
+- Sau khi sửa, chạy npm run build và kiểm tra lint phù hợp; sửa lỗi do thay đổi gây ra. Báo rõ file/chức năng đã sửa và kết quả kiểm tra.
