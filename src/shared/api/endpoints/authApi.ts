@@ -4,14 +4,24 @@ import type { AuthResponse, LoginRequest, RegisterRequest, UserProfile } from '.
 
 export type { AuthResponse, LoginRequest, RegisterRequest, UserProfile } from '../dto/auth.dto';
 
+export const authSessionUpdatedEvent = 'techstore-auth-session-updated';
+
 export function saveAuthSession(response: AuthResponse, rememberMe: boolean) {
   const storage = rememberMe ? localStorage : sessionStorage;
   const previousStorage = rememberMe ? sessionStorage : localStorage;
 
   storage.setItem('accessToken', response.accessToken);
   storage.setItem('user', JSON.stringify(response.user));
+  if (response.tokenType) storage.setItem('tokenType', response.tokenType);
+  else storage.removeItem('tokenType');
+  if (response.expiresAtUtc) storage.setItem('accessTokenExpiresAtUtc', response.expiresAtUtc);
+  else storage.removeItem('accessTokenExpiresAtUtc');
   previousStorage.removeItem('accessToken');
   previousStorage.removeItem('user');
+  previousStorage.removeItem('tokenType');
+  previousStorage.removeItem('accessTokenExpiresAtUtc');
+  clearLegacyBrowserCarts();
+  notifyAuthSessionUpdated();
 }
 
 export function getSignedInUserName(): string | null {
@@ -27,11 +37,39 @@ export function getSignedInUserName(): string | null {
   }
 }
 
+export function getSavedUserProfile(): UserProfile | null {
+  const storage = sessionStorage.getItem('accessToken') ? sessionStorage : localStorage;
+  const savedUser = storage.getItem('user');
+  if (!savedUser) return null;
+
+  try {
+    return JSON.parse(savedUser) as UserProfile;
+  } catch {
+    return null;
+  }
+}
+
 export function clearAuthSession() {
   for (const storage of [localStorage, sessionStorage]) {
     storage.removeItem('accessToken');
     storage.removeItem('user');
+    storage.removeItem('tokenType');
+    storage.removeItem('accessTokenExpiresAtUtc');
   }
+  clearLegacyBrowserCarts();
+  notifyAuthSessionUpdated();
+}
+
+function notifyAuthSessionUpdated() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(authSessionUpdatedEvent));
+}
+
+export function clearLegacyBrowserCarts() {
+  // Remove carts created by the old browser-only implementation. Account carts live on the API.
+  localStorage.removeItem('techstore-guest-cart');
+  localStorage.removeItem('techstore-demo-cart');
+  sessionStorage.removeItem('techstore-guest-cart');
+  sessionStorage.removeItem('techstore-demo-cart');
 }
 
 export function isUnauthorized(error: unknown): boolean {
@@ -50,7 +88,13 @@ export async function retryWithRefreshedSession<T>(token: string, request: (toke
   if (currentToken && currentToken !== token) return request(currentToken);
 
   const { data } = await httpClient.post<AuthResponse>('/auth/refresh');
-  if (storage.getItem('accessToken') === token) saveAuthSession(data, storage === localStorage);
+  if (!data.accessToken) throw new Error('API refresh không trả về accessToken.');
+
+  const latestToken = storage.getItem('accessToken');
+  if (!latestToken) throw new Error('Phiên đăng nhập đã kết thúc trước khi refresh hoàn tất.');
+  if (latestToken !== token) return request(latestToken);
+
+  saveAuthSession(data, storage === localStorage);
   return request(data.accessToken);
 }
 

@@ -5,15 +5,20 @@ import type {
   LocationOption,
   NewShippingAddress,
   OrderDetailsResponse,
+  PaymentMethod,
   PaymentInitiationResponse,
   PaymentOrderResponse,
   ShipmentDetailsResponse,
+  ShippingFeeRequest,
+  ShippingFeeResponse,
   ShippingAddress,
 } from '../dto/checkout.dto';
 
 export type {
   CheckoutRequest,
   CheckoutResponse,
+  CheckoutShippingAddressRequest,
+  PaymentMethod,
   LocationOption,
   NewShippingAddress,
   OrderDetailsResponse,
@@ -22,6 +27,9 @@ export type {
   PaymentOrderResponse,
   ShipmentDetailsResponse,
   ShipmentStatusHistoryResponse,
+  ShippingFeeAddressRequest,
+  ShippingFeeRequest,
+  ShippingFeeResponse,
   ShippingAddress,
 } from '../dto/checkout.dto';
 
@@ -56,6 +64,8 @@ const withToken = (token: string) => ({
   headers: { Authorization: `Bearer ${token}` },
 });
 
+const paymentMethodCodes: Record<PaymentMethod, 1 | 2> = { COD: 1, VNPAY: 2 };
+
 const isShipmentDetailsResponse = (value: object): value is ShipmentDetailsResponse =>
   'id' in value ||
   'provider' in value ||
@@ -82,6 +92,57 @@ const normalizeShipmentResponse = (data: ShipmentResponseData): ShipmentDetailsR
 const unwrapList = <T,>(data: T[] | { items?: T[] }): T[] =>
   Array.isArray(data) ? data : data.items ?? [];
 
+type ApiOrderAddress = Partial<ShippingAddress> & {
+  fullName?: string;
+  receiverName?: string;
+  receiverPhone?: string;
+  street?: string;
+  addressLine?: string;
+};
+
+type ApiOrderDetailsResponse = Omit<Partial<OrderDetailsResponse>, 'shippingAddress'> & {
+  id?: string;
+  orderId?: string;
+  subTotal?: number;
+  shippingAddress?: ApiOrderAddress | string;
+};
+
+const normalizeOrderDetails = (data: ApiOrderDetailsResponse): OrderDetailsResponse => {
+  const id = data.id ?? data.orderId;
+  if (!id) throw new Error('Dữ liệu đơn hàng từ API không có OrderId.');
+
+  const rawAddress = data.shippingAddress;
+  const shippingAddress = typeof rawAddress === 'string' || !rawAddress
+    ? rawAddress
+    : {
+        id: rawAddress.id ?? data.shippingAddressId ?? '',
+        recipientName: rawAddress.recipientName ?? rawAddress.fullName ?? rawAddress.receiverName ?? '',
+        phone: rawAddress.phone ?? rawAddress.receiverPhone ?? '',
+        email: rawAddress.email,
+        province: rawAddress.province ?? '',
+        provinceCode: rawAddress.provinceCode,
+        district: rawAddress.district ?? '',
+        districtCode: rawAddress.districtCode,
+        ward: rawAddress.ward ?? '',
+        wardCode: rawAddress.wardCode,
+        streetAddress: rawAddress.streetAddress ?? rawAddress.street ?? rawAddress.addressLine ?? '',
+        isDefault: rawAddress.isDefault,
+      };
+
+  return {
+    ...data,
+    id,
+    subtotal: data.subtotal ?? data.subTotal,
+    shippingAddress,
+    items: data.items?.map((item) => ({
+      ...item,
+      id: item.id ?? item.variantId,
+      productName: item.productName ?? item.name,
+      lineTotal: item.lineTotal ?? item.totalPrice,
+    })),
+  };
+};
+
 export const checkoutService = {
   getAddresses: async (token: string): Promise<ShippingAddress[]> => {
     const response = await axiosInstance.get<ApiAddress[] | { items?: ApiAddress[] }>(
@@ -106,18 +167,27 @@ export const checkoutService = {
 
   checkout: async (token: string, data: CheckoutRequest): Promise<CheckoutResponse> => {
     const payload = {
-      addressId: data.shippingAddressId,
-      shippingAddress: data.newShippingAddress ? toAddressRequest(data.newShippingAddress) : undefined,
-      paymentMethod: data.paymentMethod,
+      addressId: data.addressId,
+      shippingAddress: data.shippingAddress,
+      note: data.note?.trim() || null,
     };
     const response = await axiosInstance.post<CheckoutResponse>('/orders/checkout', payload, withToken(token));
     return response.data;
   },
 
-  initiatePayment: async (token: string, orderId: string): Promise<PaymentInitiationResponse> => {
+  calculateShippingFee: async (token: string, data: ShippingFeeRequest): Promise<ShippingFeeResponse> => {
+    const response = await axiosInstance.post<ShippingFeeResponse>(
+      '/orders/shipping-fee',
+      data,
+      withToken(token),
+    );
+    return response.data;
+  },
+
+  initiatePayment: async (token: string, orderId: string, method: PaymentMethod): Promise<PaymentInitiationResponse> => {
     const response = await axiosInstance.post<PaymentInitiationResponse>(
       '/payments/initiate',
-      { orderId },
+      { orderId, method: paymentMethodCodes[method] },
       withToken(token),
     );
     return response.data;
@@ -132,11 +202,11 @@ export const checkoutService = {
   },
 
   getOrderById: async (token: string, orderId: string): Promise<OrderDetailsResponse> => {
-    const response = await axiosInstance.get<OrderDetailsResponse>(
+    const response = await axiosInstance.get<ApiOrderDetailsResponse>(
       `/orders/${encodeURIComponent(orderId)}`,
       withToken(token),
     );
-    return response.data;
+    return normalizeOrderDetails(response.data);
   },
 
   cancelOrder: async (token: string, orderId: string, reason: string): Promise<void> => {
@@ -164,29 +234,29 @@ export const checkoutService = {
 
   getMyOrders: async (token: string, status?: string): Promise<OrderDetailsResponse[]> => {
     const response = await axiosInstance.get<
-      OrderDetailsResponse[] | { items?: OrderDetailsResponse[]; orders?: OrderDetailsResponse[] }
+      ApiOrderDetailsResponse[] | { items?: ApiOrderDetailsResponse[]; orders?: ApiOrderDetailsResponse[] }
     >('/orders/my-orders', {
       ...withToken(token),
       params: status ? { status } : undefined,
     });
     const data = response.data;
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data.items)) return data.items;
-    if (Array.isArray(data.orders)) return data.orders;
+    if (Array.isArray(data)) return data.map(normalizeOrderDetails);
+    if (Array.isArray(data.items)) return data.items.map(normalizeOrderDetails);
+    if (Array.isArray(data.orders)) return data.orders.map(normalizeOrderDetails);
     throw new Error('Dữ liệu danh sách đơn hàng từ API không hợp lệ.');
   },
 
   getAllOrders: async (token: string, status?: string): Promise<OrderDetailsResponse[]> => {
     const response = await axiosInstance.get<
-      OrderDetailsResponse[] | { items?: OrderDetailsResponse[]; orders?: OrderDetailsResponse[] }
+      ApiOrderDetailsResponse[] | { items?: ApiOrderDetailsResponse[]; orders?: ApiOrderDetailsResponse[] }
     >('/orders', {
       ...withToken(token),
       params: status ? { status } : undefined,
     });
     const data = response.data;
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data.items)) return data.items;
-    if (Array.isArray(data.orders)) return data.orders;
+    if (Array.isArray(data)) return data.map(normalizeOrderDetails);
+    if (Array.isArray(data.items)) return data.items.map(normalizeOrderDetails);
+    if (Array.isArray(data.orders)) return data.orders.map(normalizeOrderDetails);
     throw new Error('Dữ liệu danh sách đơn hàng từ API không hợp lệ.');
   },
 
@@ -268,17 +338,45 @@ export const checkoutService = {
   },
 };
 
+const normalizeLocationOptions = (data: unknown): LocationOption[] => {
+  let values: unknown[];
+  if (Array.isArray(data)) {
+    values = data;
+  } else if (
+    data !== null &&
+    typeof data === 'object' &&
+    'value' in data &&
+    Array.isArray(data.value)
+  ) {
+    values = data.value;
+  } else {
+    throw new Error('Dữ liệu danh mục địa chỉ từ API không đúng định dạng.');
+  }
+
+  return values.map((value) => {
+    if (value === null || typeof value !== 'object') {
+      throw new Error('Mục địa chỉ từ API không hợp lệ.');
+    }
+    const location = value as { code?: unknown; id?: unknown; name?: unknown };
+    const code = location.code ?? location.id;
+    if ((typeof code !== 'string' && typeof code !== 'number') || typeof location.name !== 'string') {
+      throw new Error('Mục địa chỉ thiếu mã hoặc tên.');
+    }
+    return { code: String(code), name: location.name };
+  });
+};
+
 export const locationService = {
   getProvinces: async (): Promise<LocationOption[]> => {
-    const response = await axiosInstance.get<LocationOption[]>('/locations/provinces');
-    return response.data;
+    const response = await axiosInstance.get<unknown>('/locations/provinces');
+    return normalizeLocationOptions(response.data);
   },
-  getDistricts: async (provinceId: number): Promise<LocationOption[]> => {
-    const response = await axiosInstance.get<LocationOption[]>('/locations/districts', { params: { provinceId } });
-    return response.data;
+  getDistricts: async (provinceId: string): Promise<LocationOption[]> => {
+    const response = await axiosInstance.get<unknown>('/locations/districts', { params: { provinceId } });
+    return normalizeLocationOptions(response.data);
   },
-  getWards: async (districtId: number): Promise<LocationOption[]> => {
-    const response = await axiosInstance.get<LocationOption[]>('/locations/wards', { params: { districtId } });
-    return response.data;
+  getWards: async (districtId: string): Promise<LocationOption[]> => {
+    const response = await axiosInstance.get<unknown>('/locations/wards', { params: { districtId } });
+    return normalizeLocationOptions(response.data);
   },
 };

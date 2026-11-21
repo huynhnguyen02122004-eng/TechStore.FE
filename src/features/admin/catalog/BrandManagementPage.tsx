@@ -152,8 +152,8 @@ export function BrandManagementPage() {
   };
 
   return (
-    <main className="min-h-[calc(100vh-7rem)] bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl">
+    <main className="min-h-[calc(100vh-68px)] bg-[#f5f7fb] px-6 py-6 text-slate-900 sm:px-8">
+      <div className="mx-auto w-full max-w-[1600px]">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">Quản trị hệ thống</p>

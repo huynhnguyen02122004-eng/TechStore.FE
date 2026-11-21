@@ -60,10 +60,10 @@ export function AddressDivisionFields({ address, onChange }: {
     if (!province?.code) { setDistricts([]); return; }
     let active = true;
     setDistricts([]);
-    locationService.getDistricts(Number(province.code)).then((items) => {
+    locationService.getDistricts(province.code).then((items) => {
       if (active) setDistricts(items);
     }).catch((error: unknown) => {
-      if (active && axios.isAxiosError(error) && error.response?.status !== 401) setLoadFailed(true);
+      if (active && (!axios.isAxiosError(error) || error.response?.status !== 401)) setLoadFailed(true);
     });
     return () => { active = false; };
   }, [province?.code]);
@@ -72,10 +72,10 @@ export function AddressDivisionFields({ address, onChange }: {
     if (!district?.code) { setWards([]); return; }
     let active = true;
     setWards([]);
-    locationService.getWards(Number(district.code)).then((items) => {
+    locationService.getWards(district.code).then((items) => {
       if (active) setWards(items);
     }).catch((error: unknown) => {
-      if (active && axios.isAxiosError(error) && error.response?.status !== 401) setLoadFailed(true);
+      if (active && (!axios.isAxiosError(error) || error.response?.status !== 401)) setLoadFailed(true);
     });
     return () => { active = false; };
   }, [district?.code]);

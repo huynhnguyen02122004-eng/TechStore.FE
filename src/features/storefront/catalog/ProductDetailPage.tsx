@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
@@ -17,14 +17,14 @@ import {
   type ProductVariantResponse,
   type VariantSpecificationResponse,
 } from '../../../services/catalogService';
-import { MOCK_PRODUCT_ID, mockProductDetail } from '../../../mocks/productDetailMock';
-import { demoCartService } from '../../../services/demoCartService';
+import { addOrIncrementAccountCartItem, getCartApiErrorMessage, getCurrentAccessToken } from '../../../services/cartService';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value);
 
 export function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const [product, setProduct] = useState<ProductResponse | null>(null);
   const [variants, setVariants] = useState<ProductVariantResponse[]>([]);
@@ -38,7 +38,14 @@ export function ProductDetailPage() {
     error?: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [cartMessage, setCartMessage] = useState<string | null>(null);
+  const [cartMessage, setCartMessage] = useState<string | null>(() =>
+    (location.state as { accountCartItemAdded?: boolean } | null)?.accountCartItemAdded
+      ? 'Đã thêm sản phẩm vào giỏ hàng.'
+      : null,
+  );
+  const [cartError, setCartError] = useState<string | null>(null);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const token = getCurrentAccessToken();
 
   const isLoading = Boolean(id) && loadedProductId !== id;
   const isLoadingSpecifications = Boolean(selectedVariantId) && specificationResult?.variantId !== selectedVariantId;
@@ -50,13 +57,7 @@ export function ProductDetailPage() {
     if (!id) return;
     let active = true;
 
-    const loadProduct = id === MOCK_PRODUCT_ID
-      ? Promise.resolve([
-          mockProductDetail.product,
-          mockProductDetail.variants,
-          mockProductDetail.images,
-        ] as const)
-      : Promise.all([
+    const loadProduct = Promise.all([
           catalogService.getProductById(id),
           catalogService.getVariants(id),
           catalogService.getProductImages(id),
@@ -67,10 +68,10 @@ export function ProductDetailPage() {
         if (!active) return;
         setError(null);
         setProduct(productData);
-        setVariants(variantData.filter((variant) => !variant.status || variant.status.toUpperCase() === 'ACTIVE'));
-        setSelectedVariantId(
-          variantData.find((variant) => !variant.status || variant.status.toUpperCase() === 'ACTIVE')?.id ?? '',
-        );
+        const activeVariants = variantData.filter((variant) => !variant.status || variant.status.toUpperCase() === 'ACTIVE');
+        setVariants(activeVariants);
+        // Auto-select first active variant so cart button is immediately enabled
+        setSelectedVariantId(activeVariants[0]?.id ?? '');
         setSelectedImageIndex(0);
         setImages(
           [...imageData].sort(
@@ -96,19 +97,12 @@ export function ProductDetailPage() {
     if (!selectedVariantId) return;
     let active = true;
 
-    const mockSpecifications = Object.entries(mockProductDetail.specifications).find(
-      ([variantId]) => variantId === selectedVariantId,
-    )?.[1];
-    const loadSpecifications = mockSpecifications
-      ? Promise.resolve(mockSpecifications)
-      : catalogService.getVariantSpecifications(selectedVariantId);
-
-    loadSpecifications
+    catalogService.getVariantSpecifications(selectedVariantId)
       .then((data) => {
         if (active) {
           setSpecificationResult({
             variantId: selectedVariantId,
-            items: [...data].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)),
+            items: data,
           });
         }
       })
@@ -131,31 +125,51 @@ export function ProductDetailPage() {
     () => variants.find((variant) => variant.id === selectedVariantId),
     [variants, selectedVariantId],
   );
-  const selectedImage = images[selectedImageIndex]?.imageUrl;
+  const selectedImage = images[selectedImageIndex]?.imageUrl ?? product?.primaryImageUrl ?? product?.imageUrl;
 
   const moveImage = (direction: -1 | 1) => {
     if (images.length < 2) return;
     setSelectedImageIndex((current) => (current + direction + images.length) % images.length);
   };
 
-  const addMockItemToCart = () => {
-    if (!selectedVariant || id !== MOCK_PRODUCT_ID) return;
-    demoCartService.addItem({
-      productId: MOCK_PRODUCT_ID,
-      variantId: selectedVariant.id,
-      productName: product?.name ?? mockProductDetail.product.name,
-      variantLabel: selectedVariant.attributesSummary,
-      sku: selectedVariant.sku,
-      unitPrice: selectedVariant.price,
-      imageUrl: selectedImage ?? mockProductDetail.images[0].imageUrl,
-      quantity: 1,
-    });
-    setCartMessage('Đã thêm sản phẩm mẫu vào giỏ hàng.');
+  const addSelectedItemToCart = async () => {
+    if (!selectedVariant || !product || isAddingToCart) return false;
+    if (!token) {
+      const params = new URLSearchParams({
+        returnUrl: `/product/${product.id}`,
+        addVariantId: selectedVariant.id,
+      });
+      navigate(`/login?${params.toString()}`);
+      return false;
+    }
+
+    setIsAddingToCart(true);
+    setCartMessage(null);
+    setCartError(null);
+    try {
+      await addOrIncrementAccountCartItem(token, selectedVariant.id, 1);
+      setCartMessage('Đã thêm sản phẩm vào giỏ hàng.');
+      return true;
+    } catch (requestError) {
+      setCartError(getCartApiErrorMessage(requestError, 'Không thể thêm sản phẩm vào giỏ. Vui lòng thử lại.'));
+      return false;
+    } finally {
+      setIsAddingToCart(false);
+    }
   };
 
-  const buyMockNow = () => {
-    if (id !== MOCK_PRODUCT_ID || !selectedVariant) return;
-    addMockItemToCart();
+  const buySelectedNow = async () => {
+    if (!selectedVariant) return;
+    if (!token && product) {
+      const params = new URLSearchParams({
+        returnUrl: '/checkout',
+        addVariantId: selectedVariant.id,
+      });
+      navigate(`/login?${params.toString()}`);
+      return;
+    }
+    const added = await addSelectedItemToCart();
+    if (!added) return;
     navigate('/checkout');
   };
 
@@ -204,11 +218,6 @@ export function ProductDetailPage() {
       </div>
 
       <main className="mx-auto max-w-[1500px] px-4 pb-8 pt-5 sm:px-6">
-        {id === MOCK_PRODUCT_ID && (
-          <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 text-xs font-medium text-blue-800">
-            Đây là dữ liệu minh họa để xem giao diện MH-04; không phải thông tin sản phẩm thực tế.
-          </div>
-        )}
         <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2">
           <h1 className="text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">{product.name}</h1>
           {product.brandName && <span className="text-sm text-slate-500">Thương hiệu: <strong>{product.brandName}</strong></span>}
@@ -254,6 +263,17 @@ export function ProductDetailPage() {
               )}
             </div>
 
+            {variants.length > 0 && <fieldset className="mt-5 border-t border-slate-100 pt-5">
+              <legend className="mb-3 text-sm font-bold text-slate-800">Chọn cấu hình</legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {variants.map((variant) => <label key={variant.id} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition ${selectedVariantId === variant.id ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-slate-200 hover:border-blue-300'}`}>
+                  <input type="radio" name="variant" checked={selectedVariantId === variant.id} onChange={() => { setSelectedVariantId(variant.id); setSelectedImageIndex(0); }} className="h-4 w-4 accent-blue-600" />
+                  <img src={images.find((image) => image.isPrimary)?.imageUrl ?? images[0]?.imageUrl ?? product.imageUrl ?? ''} alt="" className="h-12 w-12 rounded-lg bg-white object-contain" />
+                  <span className="min-w-0"><span className="block truncate text-sm font-semibold">{variant.variantName}</span><span className="mt-1 block text-sm font-bold text-red-600">{formatCurrency(variant.price)}</span></span>
+                </label>)}
+              </div>
+            </fieldset>}
+
             {images.length > 1 && (
               <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
                 {images.map((image, index) => (
@@ -277,27 +297,6 @@ export function ProductDetailPage() {
           <section className="rounded-2xl bg-white p-5 shadow-sm sm:p-6" aria-label="Chọn cấu hình sản phẩm">
             {variants.length > 0 ? (
               <>
-                <fieldset>
-                  <legend className="mb-3 text-sm font-bold text-slate-800">Chọn cấu hình phù hợp</legend>
-                  <div className="flex flex-wrap gap-2">
-                    {variants.map((variant) => (
-                      <button
-                        key={variant.id}
-                        type="button"
-                        onClick={() => setSelectedVariantId(variant.id)}
-                        aria-pressed={selectedVariantId === variant.id}
-                        className={`min-h-11 rounded-lg border px-4 py-2 text-sm font-medium transition ${
-                          selectedVariantId === variant.id
-                            ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500'
-                            : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300'
-                        }`}
-                      >
-                        {variant.attributesSummary}
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
-
                 <div className="mt-7 border-t border-slate-100 pt-5">
                   <p className="flex items-center gap-1.5 text-sm text-slate-600">
                     Giá sản phẩm
@@ -322,7 +321,7 @@ export function ProductDetailPage() {
               </>
             ) : (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                Sản phẩm hiện chưa có cấu hình để lựa chọn.
+                Sản phẩm không có cấu hình khả dụng.
               </div>
             )}
 
@@ -357,6 +356,7 @@ export function ProductDetailPage() {
                   <Link to="/cart" className="font-bold underline">Xem giỏ hàng</Link>
                 </p>
               )}
+              {cartError && <p role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{cartError}</p>}
             </div>
           </section>
         </div>
@@ -364,7 +364,7 @@ export function ProductDetailPage() {
         <section id="specifications" className="mt-6 scroll-mt-32 overflow-hidden rounded-2xl bg-white shadow-sm">
           <div className="border-b border-slate-100 px-5 py-4">
             <h2 className="text-lg font-bold text-slate-800">Thông số kỹ thuật</h2>
-            {selectedVariant && <p className="mt-1 text-xs text-slate-500">{selectedVariant.attributesSummary}</p>}
+            {selectedVariant && <p className="mt-1 text-xs text-slate-500">{selectedVariant.variantName}</p>}
           </div>
           {isLoadingSpecifications ? (
             <div className="space-y-3 p-5" aria-live="polite">
@@ -377,9 +377,9 @@ export function ProductDetailPage() {
           ) : specifications.length > 0 ? (
             <dl className="divide-y divide-slate-100">
               {specifications.map((spec, index) => (
-                <div key={spec.id || `${spec.specKey}-${index}`} className="grid grid-cols-[40%_60%] px-5 py-3 text-sm even:bg-slate-50">
-                  <dt className="font-medium text-slate-500">{spec.specKey}</dt>
-                  <dd className="text-slate-800">{spec.specValue}</dd>
+                <div key={spec.id || `${spec.specName}-${index}`} className="grid grid-cols-[40%_60%] px-5 py-3 text-sm even:bg-slate-50">
+                  <dt className="font-medium text-slate-500">{spec.specName}</dt>
+                  <dd className="text-slate-800">{spec.specValue}{spec.unit ? ` ${spec.unit}` : ''}</dd>
                 </div>
               ))}
             </dl>
@@ -406,7 +406,7 @@ export function ProductDetailPage() {
             )}
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-slate-800">{product.name}</p>
-              <p className="mt-1 text-xs text-slate-500">{selectedVariant?.attributesSummary ?? 'Chưa chọn cấu hình'}</p>
+              <p className="mt-1 text-xs text-slate-500">{selectedVariant?.variantName ?? 'Chưa chọn cấu hình'}</p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-3 sm:gap-5">
@@ -418,19 +418,17 @@ export function ProductDetailPage() {
             </div>
             <button
               type="button"
-              onClick={addMockItemToCart}
-              disabled={id !== MOCK_PRODUCT_ID || !selectedVariant}
-              title={id === MOCK_PRODUCT_ID ? 'Thêm cấu hình mẫu vào giỏ hàng demo' : 'Cần API giỏ hàng để thêm sản phẩm thật'}
+              onClick={() => void addSelectedItemToCart()}
+              disabled={!selectedVariant || isAddingToCart}
               className="flex h-12 items-center justify-center rounded-xl border border-blue-500 px-3 text-xs font-bold text-blue-600 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 sm:px-5 sm:text-sm"
             >
-              <span className="sm:hidden">Thêm giỏ</span>
-              <span className="hidden sm:inline">Thêm vào giỏ</span>
+              <span className="sm:hidden">{isAddingToCart ? 'Đang thêm…' : 'Thêm giỏ'}</span>
+              <span className="hidden sm:inline">{isAddingToCart ? 'Đang thêm…' : 'Thêm vào giỏ'}</span>
             </button>
             <button
               type="button"
-              onClick={buyMockNow}
-              disabled={id !== MOCK_PRODUCT_ID || !selectedVariant}
-              title={id === MOCK_PRODUCT_ID ? 'Thêm sản phẩm mẫu và chuyển đến thanh toán demo' : 'Cần API giỏ hàng để mua sản phẩm thật'}
+              onClick={() => void buySelectedNow()}
+              disabled={!selectedVariant || isAddingToCart}
               className="h-12 rounded-xl bg-[#1b64c7] px-4 text-xs font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:text-sm"
             >
               Mua ngay

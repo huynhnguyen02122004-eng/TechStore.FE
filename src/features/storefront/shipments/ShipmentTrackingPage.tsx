@@ -16,6 +16,7 @@ import {
   type ShipmentDetailsResponse,
   type ShipmentStatusHistoryResponse,
 } from '../../../services/checkoutService';
+import { AccountSidebar } from '../../../shared/layouts/AccountSidebar';
 
 const DEMO_TRACKING_CODE = 'DEMO-TRK-2026-001';
 
@@ -180,18 +181,27 @@ export function ShipmentTrackingPage() {
     : shipment?.provider || 'Chưa cập nhật';
 
   return (
-    <main className="min-h-[calc(100vh-7rem)] bg-[#f5f7fb] px-4 py-8 pb-12 text-slate-900 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-5xl">
-        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#0f56bd] via-[#1459bd] to-[#173d8d] px-5 py-8 text-white shadow-lg sm:px-9 sm:py-10">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
-              <Truck className="h-7 w-7" />
+    <main className="min-h-[calc(100vh-7rem)] bg-slate-50/70 px-4 py-6 pb-12 text-slate-900 sm:px-6 sm:py-8 lg:px-8">
+      <div className="mx-auto grid w-full max-w-[1320px] items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <AccountSidebar />
+        <div className="min-w-0">
+        <div className="mb-5">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">Tài khoản của bạn</p>
+          <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-[28px]">Tra cứu vận đơn</h1>
+          <p className="mt-1.5 text-sm text-slate-500">Theo dõi hành trình giao hàng bằng mã vận đơn.</p>
+        </div>
+        <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white px-5 py-5 shadow-sm sm:px-6">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+              <Truck className="h-5 w-5" />
             </div>
-            <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-blue-100">TechStore · Theo dõi đơn hàng</p>
-            <h1 className="mt-2 text-2xl font-extrabold sm:text-3xl">Tra cứu vận đơn</h1>
-            <p className="mt-2 text-sm leading-6 text-blue-100">Nhập mã vận đơn để xem trạng thái giao hàng mới nhất.</p>
+            <div>
+              <p className="text-sm font-bold text-slate-950">TechStore · Theo dõi đơn hàng</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Nhập mã vận đơn để xem trạng thái giao hàng mới nhất.</p>
+            </div>
+          </div>
 
-            <form onSubmit={submitSearch} className="mt-6 flex flex-col gap-2 rounded-2xl bg-white p-2 sm:flex-row">
+            <form onSubmit={submitSearch} className="mt-4 flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 sm:flex-row">
               <label className="relative min-w-0 flex-1">
                 <span className="sr-only">Mã vận đơn</span>
                 <PackageCheck className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
@@ -212,8 +222,7 @@ export function ShipmentTrackingPage() {
                 Tra cứu
               </button>
             </form>
-            {inputError && <p role="alert" className="mt-2 text-left text-sm text-amber-100">{inputError}</p>}
-          </div>
+            {inputError && <p role="alert" className="mt-2 text-left text-sm text-red-600">{inputError}</p>}
         </section>
 
         {!routeCode && (
@@ -230,7 +239,11 @@ export function ShipmentTrackingPage() {
               </Link>
               <div className="mt-6 border-t border-slate-100 pt-5">
                 <p className="text-xs text-slate-500">Muốn xem thử giao diện? Dùng mã demo</p>
-                <button type="button" onClick={() => setDraft({ routeCode, value: DEMO_TRACKING_CODE })} className="mt-2 rounded-lg bg-slate-100 px-3 py-2 font-mono text-xs font-semibold text-slate-700 hover:bg-slate-200">
+                <button type="button" onClick={() => {
+                  setDraft({ routeCode: DEMO_TRACKING_CODE, value: DEMO_TRACKING_CODE });
+                  setSearchParams({ trackingCode: DEMO_TRACKING_CODE });
+                  setLookupVersion((version) => version + 1);
+                }} className="mt-2 rounded-lg bg-slate-100 px-3 py-2 font-mono text-xs font-semibold text-slate-700 hover:bg-slate-200">
                   {DEMO_TRACKING_CODE}
                 </button>
               </div>
@@ -330,6 +343,7 @@ export function ShipmentTrackingPage() {
             </div>
           </section>
         )}
+        </div>
       </div>
     </main>
   );

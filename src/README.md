@@ -37,7 +37,7 @@ src/
 │   │   ├── dto/                  # Request/response contracts
 │   │   └── endpoints/            # Auth, catalog, checkout, inventory APIs
 │   ├── components/               # AddressDivisionFields
-│   └── layouts/                  # StorefrontNavigation (including search), layout
+│   └── layouts/                  # StorefrontLayout, AdminLayout, StorefrontNavigation
 ├── services/
 │   ├── demo*.ts                  # Local/demo adapters
 │   └── *Service.ts               # Compatibility exports to shared API endpoints
@@ -59,7 +59,7 @@ src/
 - Request/response types nằm trong `shared/api/dto/`; endpoint implementation nằm trong `shared/api/endpoints/`.
 - Các file trong `services/` giữ export cũ để page và demo adapter hiện tại không phải đổi imports cùng lúc. Mã mới nên import endpoint/DTO trực tiếp từ `shared/api/`.
 - `VITE_SERVICE_MODE=api` (mặc định) dùng API cho màn hình quản trị khi có access token. `VITE_SERVICE_MODE=demo` dùng các `demo*Service` cho màn hình quản trị. Khi chưa có token, các màn hình đó vẫn dùng demo để bảo toàn luồng guest hiện hữu.
-- Storefront tiếp tục dùng quy tắc mock/demo theo từng luồng hiện tại (ví dụ giỏ hàng và checkout demo); không bị ép sang một chế độ toàn cục làm thay đổi nghiệp vụ.
+- Storefront dùng API thật cho giỏ hàng tài khoản và checkout. Người dùng cần đăng nhập để thêm hàng, xem giỏ hoặc đặt hàng; những luồng demo khác vẫn được giữ theo cấu hình hiện có.
 
 ## Lộ trình di chuyển an toàn
 

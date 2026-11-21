@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   CheckCircle2,
@@ -13,9 +13,11 @@ import {
 } from 'lucide-react';
 import {
   checkoutService,
+  type CheckoutResponse,
   type OrderDetailsResponse,
   type PaymentOrderResponse,
 } from '../../../services/checkoutService';
+import { retryWithRefreshedSession } from '../../../services/authService';
 import { demoOrderService, type DemoOrderResult } from '../../../services/demoOrderService';
 
 type CheckoutResult = {
@@ -51,7 +53,9 @@ const getDemoResult = (result: DemoOrderResult): CheckoutResult => ({
 
 export function CheckoutResultPage() {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const orderId = searchParams.get('orderId') ?? '';
+  const checkoutResponse = (location.state as { checkoutResponse?: CheckoutResponse } | null)?.checkoutResponse;
   const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
   const isDemoResult = orderId.startsWith('DEMO-');
   const [result, setResult] = useState<CheckoutResult | null>(null);
@@ -78,8 +82,8 @@ export function CheckoutResultPage() {
 
       if (!token) throw new Error('Vui lòng đăng nhập để xem kết quả đơn hàng.');
       const [payment, order] = await Promise.all([
-        checkoutService.getPaymentByOrderId(token, orderId),
-        checkoutService.getOrderById(token, orderId),
+        retryWithRefreshedSession(token, (validToken) => checkoutService.getPaymentByOrderId(validToken, orderId)),
+        retryWithRefreshedSession(token, (validToken) => checkoutService.getOrderById(validToken, orderId)),
       ]);
       return { payment: normalizePayment(payment), order };
     };
@@ -234,7 +238,7 @@ export function CheckoutResultPage() {
             </div>
             <div className="rounded-xl bg-slate-50 p-4 text-left sm:col-span-2">
               <p className="text-xs text-slate-500">Tổng thanh toán</p>
-              <strong className="mt-1 block text-2xl font-extrabold text-red-600">{formatCurrency(order.grandTotal)}</strong>
+              <strong className="mt-1 block text-2xl font-extrabold text-red-600">{formatCurrency(order.grandTotal ?? ((checkoutResponse?.id ?? checkoutResponse?.orderId) === order.id ? checkoutResponse?.grandTotal : undefined))}</strong>
             </div>
           </div>
 

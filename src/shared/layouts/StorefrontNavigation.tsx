@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronDown, MapPin, Menu, Search, ShoppingBag, UserRound } from 'lucide-react';
-import { demoCartService, demoCartUpdatedEvent } from '../../services/demoCartService';
-import { getSignedInUserName } from '../../services/authService';
+import { BadgeCheck, ChevronDown, ClipboardList, MapPin, Menu, Repeat2, Search, ShoppingBag, Store, Truck, UserRound } from 'lucide-react';
+import { cartUpdatedEvent, getCartItemCount, getCurrentAccessToken } from '../../services/cartService';
+import { authSessionUpdatedEvent, clearLegacyBrowserCarts, getSavedUserProfile, getSignedInUserName } from '../../services/authService';
 
 export function StorefrontNavigation() {
   const location = useLocation();
@@ -10,16 +10,76 @@ export function StorefrontNavigation() {
   const [headerSearch, setHeaderSearch] = useState(
     () => new URLSearchParams(location.search).get('searchTerm') ?? '',
   );
-  const [cartCount, setCartCount] = useState(() => demoCartService.getItemCount());
+  const [cartCount, setCartCount] = useState(0);
+  const [token, setToken] = useState(getCurrentAccessToken);
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
   const userName = getSignedInUserName();
-  const accountPath = userName ? '/profile/addresses' : '/login';
+  const profile = getSavedUserProfile();
+  const roles = (profile?.roles ?? []).map((role) =>
+    role.trim().toUpperCase().replace(/[\s-]+/g, '_'),
+  );
+  const isOwner = roles.includes('OWNER');
+  const isWarehouseStaff = roles.includes('WAREHOUSE_STAFF');
+  const accountPath = isOwner
+    ? '/admin/categories'
+    : isWarehouseStaff
+      ? '/admin/inventory'
+      : userName
+        ? '/profile/addresses'
+        : '/login';
+  const accountDescription = isOwner
+    ? 'Trang quản trị'
+    : isWarehouseStaff
+      ? 'Khu vực kho vận'
+      : userName
+        ? 'Hồ sơ & sổ địa chỉ'
+        : 'Đăng nhập / Đăng ký';
+  const storeNoticeItems = <>
+    <span className="flex items-center gap-2"><Truck aria-hidden="true" className="h-4 w-4" />Giao nhanh - Miễn phí cho đơn 1 Triệu</span>
+    <span aria-hidden="true" className="text-white/50">•</span>
+    <span className="flex items-center gap-2"><Repeat2 aria-hidden="true" className="h-4 w-4" />Thu cũ giá ngon - Lên đời tiết kiệm</span>
+    <span aria-hidden="true" className="text-white/50">•</span>
+    <span className="flex items-center gap-2"><BadgeCheck aria-hidden="true" className="h-4 w-4" />Sản phẩm chính hãng - Xuất VAT</span>
+    <span aria-hidden="true" className="text-white/50">•</span>
+    <Link to="/" className="flex items-center gap-2 hover:text-white/80"><Store aria-hidden="true" className="h-4 w-4" />Cửa hàng gần bạn</Link>
+    <span aria-hidden="true" className="text-white/50">•</span>
+    <Link to="/tracking" className="flex items-center gap-2 hover:text-white/80"><ClipboardList aria-hidden="true" className="h-4 w-4" />Tra cứu đơn hàng</Link>
+    <span aria-hidden="true" className="text-white/50">•</span>
+  </>;
 
   useEffect(() => {
-    const updateCartCount = () => setCartCount(demoCartService.getItemCount());
-    window.addEventListener(demoCartUpdatedEvent, updateCartCount);
-    return () => window.removeEventListener(demoCartUpdatedEvent, updateCartCount);
+    clearLegacyBrowserCarts();
+    const refreshToken = () => setToken(getCurrentAccessToken());
+    window.addEventListener(authSessionUpdatedEvent, refreshToken);
+    window.addEventListener('storage', refreshToken);
+    return () => {
+      window.removeEventListener(authSessionUpdatedEvent, refreshToken);
+      window.removeEventListener('storage', refreshToken);
+    };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const updateCartCount = async () => {
+      if (!token) {
+        setCartCount(0);
+        return;
+      }
+      try {
+        const count = await getCartItemCount(token);
+        if (active) setCartCount(count);
+      } catch {
+        if (active) setCartCount(0);
+      }
+    };
+    const handleCartUpdate = () => { void updateCartCount(); };
+    void updateCartCount();
+    window.addEventListener(cartUpdatedEvent, handleCartUpdate);
+    return () => {
+      active = false;
+      window.removeEventListener(cartUpdatedEvent, handleCartUpdate);
+    };
+  }, [token]);
 
   const submitHeaderSearch = (event: FormEvent) => {
     event.preventDefault();
@@ -39,7 +99,7 @@ export function StorefrontNavigation() {
             <Menu className="h-5 w-5" />
           </button>
           <Link to="/" className="shrink-0 text-[19px] font-black italic leading-none tracking-tight sm:text-[24px]" aria-label="TechStore - Trang chủ">
-            <span className="block">techstore</span>
+            <span className="block">TechStore</span>
             <span className="mt-1 block text-center text-[8px] font-bold uppercase not-italic tracking-[0.3em]">tech for everyone</span>
           </Link>
 
@@ -79,29 +139,16 @@ export function StorefrontNavigation() {
 
   return (
     <header className="sticky top-0 z-50">
-      <div className="h-8 bg-[#1649a7] text-white">
-        <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-4 text-[11px] sm:px-6 lg:px-8">
-          <span className="font-medium">Miễn phí giao hàng đơn từ 1 triệu</span>
-          <div className="hidden items-center gap-4 md:flex">
-            <span>Hotline: <strong>1800 6868</strong></span>
-            <span>Hệ thống cửa hàng</span>
-            <Link to="/profile/orders" className="hover:text-blue-100">Đơn hàng của tôi</Link>
-            <Link to="/tracking" className="hover:text-blue-100">Tra cứu vận đơn</Link>
-            <Link to="/profile/addresses" className="hover:text-blue-100">Sổ địa chỉ</Link>
-            <Link to="/admin/categories" className="hover:text-blue-100">Quản lý danh mục</Link>
-            <Link to="/admin/brands" className="hover:text-blue-100">Quản lý thương hiệu</Link>
-            <Link to="/admin/products" className="hover:text-blue-100">Quản lý sản phẩm</Link>
-            <Link to="/admin/orders" className="hover:text-blue-100">Quản lý đơn hàng</Link>
-            <Link to="/admin/payments" className="hover:text-blue-100">Quản lý thanh toán</Link>
-            <Link to="/admin/shipments" className="hover:text-blue-100">Quản lý vận đơn</Link>
-            <Link to="/admin/inventory" className="hover:text-blue-100">Quản lý tồn kho</Link>
-            <Link to="/admin/inventory/transactions" className="hover:text-blue-100">Lịch sử & Giữ hàng</Link>
+      <div className="overflow-hidden bg-[#0f56bd] text-white" aria-label="Thông tin cửa hàng">
+        <div className="flex min-h-10 items-center overflow-hidden">
+          <div className="flex w-max animate-[storefront-marquee_34s_linear_infinite] items-center whitespace-nowrap text-xs font-bold motion-reduce:animate-none sm:text-sm">
+            <div className="flex items-center gap-3 px-4">{storeNoticeItems}</div>
+            <div aria-hidden="true" className="flex items-center gap-3 px-4">{storeNoticeItems}</div>
           </div>
         </div>
       </div>
-
       <div className="border-b border-slate-200/80 bg-[#0f56bd]">
-        <div className="mx-auto grid h-[74px] max-w-7xl grid-cols-[150px_minmax(0,1fr)_auto] items-center gap-2 px-3 sm:grid-cols-[180px_minmax(180px,1fr)_auto] sm:gap-4 sm:px-6 lg:px-8">
+        <div className="mx-auto grid min-h-[74px] max-w-7xl grid-cols-[150px_minmax(0,1fr)_auto] items-center gap-2 px-3 sm:grid-cols-[180px_minmax(0,1fr)_auto_auto] sm:gap-4 sm:px-6 lg:px-8">
           <Link to="/" className="flex items-center gap-2.5 text-white" aria-label="TechStore - Trang chủ">
             <div className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-white shadow-md">
               <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#1b63c6]">
@@ -109,12 +156,12 @@ export function StorefrontNavigation() {
               </div>
             </div>
             <div>
-              <span className="block text-[20px] font-extrabold leading-none tracking-tight">techstore</span>
+              <span className="block text-[20px] font-extrabold leading-none tracking-tight">TechStore</span>
               <span className="mt-1 block text-[8px] font-bold uppercase tracking-[0.28em] text-blue-100">Tech for everyone</span>
             </div>
           </Link>
 
-          <form onSubmit={submitHeaderSearch} className="relative mx-auto w-full max-w-[480px]">
+          <form onSubmit={submitHeaderSearch} className="relative mx-auto w-full max-w-[480px] min-w-0">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="search"
@@ -129,12 +176,14 @@ export function StorefrontNavigation() {
             </button>
           </form>
 
+          <a href="tel:18006868" className="hidden shrink-0 items-center text-xs font-semibold text-white xl:flex">Hotline: 1800 6868</a>
+
           <div className="flex items-center gap-5 text-white">
             <Link to={accountPath} className="hidden items-center gap-2 lg:flex">
               <UserRound className="h-6 w-6" />
               <div className="text-[12px] leading-tight">
                 <strong className="block max-w-36 truncate" title={userName ?? undefined}>{userName ?? 'Tài khoản'}</strong>
-                <span className="text-[10px] text-blue-100">{userName ? 'Hồ sơ & sổ địa chỉ' : 'Đăng nhập / Đăng ký'}</span>
+                <span className="text-[10px] text-blue-100">{accountDescription}</span>
               </div>
             </Link>
             <Link to="/cart" className="flex items-center gap-2" aria-label="Giỏ hàng">

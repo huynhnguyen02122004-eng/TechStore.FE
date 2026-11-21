@@ -145,8 +145,8 @@ export function InventoryManagementPage() {
   };
 
   return (
-    <main className="min-h-[calc(100vh-7rem)] bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
+    <main className="min-h-[calc(100vh-68px)] bg-[#f5f7fb] px-6 py-6 text-slate-900 sm:px-8">
+      <div className="mx-auto w-full max-w-[1600px]">
         <div className="mb-6 flex items-end justify-between gap-4">
           <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">Quản trị hệ thống</p><h1 className="mt-1 text-2xl font-extrabold">Quản lý tồn kho</h1><p className="mt-1 text-sm text-slate-500">Theo dõi tồn kho và thiết lập ngưỡng cảnh báo.</p></div>
           <button type="button" onClick={() => setReload((value) => value + 1)} className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700">Tải lại</button>

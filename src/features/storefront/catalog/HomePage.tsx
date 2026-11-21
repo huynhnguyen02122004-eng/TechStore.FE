@@ -143,7 +143,7 @@ export function HomePage() {
                   Nâng cấp trải nghiệm mới ngày với những thiết bị công nghệ chính hãng, tuyển chọn dành riêng cho bạn.
                 </p>
                 <div className="mt-7 flex items-center gap-4">
-                  <Link to="/product/mock-iphone" className="inline-flex h-12 items-center rounded-lg bg-white px-6 text-sm font-bold text-[#1b64c7] shadow-lg shadow-blue-950/10 transition hover:-translate-y-0.5">
+                  <Link to="/" className="inline-flex h-12 items-center rounded-lg bg-white px-6 text-sm font-bold text-[#1b64c7] shadow-lg shadow-blue-950/10 transition hover:-translate-y-0.5">
                     Khám phá ngay <span className="ml-2">→</span>
                   </Link>
                   <div className="hidden items-center sm:flex">

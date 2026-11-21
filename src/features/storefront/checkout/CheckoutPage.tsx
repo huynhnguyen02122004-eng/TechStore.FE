@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AddressDivisionFields } from '../../../shared/components/AddressDivisionFields';
@@ -12,15 +12,18 @@ import {
   ShieldCheck,
   Truck,
 } from 'lucide-react';
-import { demoCartService, type DemoCartItem } from '../../../services/demoCartService';
+import type { CartItemResponse } from '../../../shared/api/endpoints/cartApi';
+import { getAccountCart, getCurrentAccessToken, notifyCartUpdated } from '../../../services/cartService';
+import { retryWithRefreshedSession } from '../../../services/authService';
 import {
   checkoutService,
   type CheckoutRequest,
   type NewShippingAddress,
+  type PaymentMethod,
+  type ShippingFeeRequest,
+  type ShippingFeeResponse,
   type ShippingAddress,
 } from '../../../services/checkoutService';
-import { demoOrderService } from '../../../services/demoOrderService';
-import { demoAddressService } from '../../../services/demoAddressService';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value);
@@ -36,42 +39,148 @@ const emptyAddress: NewShippingAddress = {
 
 const getApiError = (error: unknown) => {
   if (axios.isAxiosError<{ detail?: string; message?: string }>(error)) {
-    return error.response?.data?.detail || error.response?.data?.message || 'Yêu cầu chưa hoàn tất. Vui lòng thử lại.';
+    return error.response?.data?.detail || error.response?.data?.message ||
+      (error.response ? `Yêu cầu chưa hoàn tất (HTTP ${error.response.status}). Vui lòng thử lại.` : 'Không thể kết nối đến máy chủ. Vui lòng thử lại.');
   }
   return 'Không thể kết nối đến dịch vụ đặt hàng. Vui lòng thử lại.';
 };
 
 export function CheckoutPage() {
   const navigate = useNavigate();
-  const [cartItems] = useState<DemoCartItem[]>(() => demoCartService.getItems());
-  const isDemoCheckout = cartItems.length > 0 && cartItems.every((item) => item.productId === 'mock-iphone');
-  const [demoAddresses] = useState(() => isDemoCheckout ? demoAddressService.getAll() : []);
-  const [addresses, setAddresses] = useState<ShippingAddress[]>(demoAddresses);
-  const [selectedAddressId, setSelectedAddressId] = useState(
-    demoAddresses.find((address) => address.isDefault)?.id ?? '',
-  );
-  const [useNewAddress, setUseNewAddress] = useState(!isDemoCheckout);
-  const [saveNewAddress, setSaveNewAddress] = useState(true);
+  const [cartItems, setCartItems] = useState<CartItemResponse[]>([]);
+  const [cartLoadedForToken, setCartLoadedForToken] = useState<string | null>(null);
+  const token = getCurrentAccessToken();
+  const requiresLoginToCheckout = !token;
+  const [addresses, setAddresses] = useState<ShippingAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState('');
+  const [useNewAddress, setUseNewAddress] = useState(true);
   const [newAddress, setNewAddress] = useState<NewShippingAddress>(emptyAddress);
-  const [paymentMethod, setPaymentMethod] = useState<1 | 2>(1);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
+  const [notes, setNotes] = useState('');
+  const [pendingPaymentOrderId, setPendingPaymentOrderId] = useState<string | null>(null);
+  const [cartSubtotal, setCartSubtotal] = useState(0);
+  const [shippingQuote, setShippingQuote] = useState<ShippingFeeResponse | null>(null);
+  const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
+  const [shippingFeeError, setShippingFeeError] = useState<string | null>(null);
   const [addressesLoadedForToken, setAddressesLoadedForToken] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const subtotal = useMemo(
-    () => cartItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0),
-    [cartItems],
-  );
-  const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
+  const subtotal = cartSubtotal;
+  const isLoadingCart = Boolean(token) && cartLoadedForToken !== token;
   const isLoadingAddresses =
-    Boolean(token) && !isDemoCheckout && addressesLoadedForToken !== token;
+    Boolean(token) && addressesLoadedForToken !== token;
 
   useEffect(() => {
-    if (isDemoCheckout || !token) return;
+    if (!token) return;
 
     let active = true;
-    checkoutService
-      .getAddresses(token)
+    retryWithRefreshedSession(token, (validToken) => getAccountCart(validToken))
+      .then((cart) => {
+        if (!active) return;
+        setCartItems(cart.items);
+        setCartSubtotal(cart.subtotal);
+      })
+      .catch((requestError: unknown) => {
+        if (active) setError(getApiError(requestError));
+      })
+      .finally(() => {
+        if (active) setCartLoadedForToken(token);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token || cartLoadedForToken !== token || cartItems.length === 0) {
+      setShippingQuote(null);
+      setIsCalculatingShipping(false);
+      setShippingFeeError(null);
+      return;
+    }
+
+    let request: ShippingFeeRequest | null = null;
+    if (!useNewAddress && selectedAddressId) {
+      request = {
+        addressId: selectedAddressId,
+        shippingAddress: null,
+        note: notes.trim(),
+      };
+    } else if (useNewAddress) {
+      const hasAddressNames = [
+        newAddress.recipientName,
+        newAddress.phone,
+        newAddress.province,
+        newAddress.district,
+        newAddress.ward,
+        newAddress.streetAddress,
+      ].every((value) => value.trim());
+      const hasDivisionCodes = Boolean(newAddress.provinceCode && newAddress.districtCode && newAddress.wardCode);
+
+      if (hasAddressNames && hasDivisionCodes) {
+        request = {
+          addressId: null,
+          shippingAddress: {
+            receiverName: newAddress.recipientName.trim(),
+            receiverPhone: newAddress.phone.trim(),
+            province: newAddress.province.trim(),
+            provinceCode: newAddress.provinceCode!,
+            district: newAddress.district.trim(),
+            districtCode: newAddress.districtCode!,
+            ward: newAddress.ward.trim(),
+            wardCode: newAddress.wardCode!,
+            addressLine: newAddress.streetAddress.trim(),
+          },
+          note: notes.trim(),
+        };
+      }
+    }
+
+    if (!request) {
+      setShippingQuote(null);
+      setIsCalculatingShipping(false);
+      setShippingFeeError(null);
+      return;
+    }
+
+    let active = true;
+    setShippingQuote(null);
+    setIsCalculatingShipping(true);
+    setShippingFeeError(null);
+    const timeoutId = window.setTimeout(() => {
+      retryWithRefreshedSession(token, (validToken) => checkoutService.calculateShippingFee(validToken, request!))
+        .then((quote) => {
+          if (active) setShippingQuote(quote);
+        })
+        .catch((requestError: unknown) => {
+          if (active) setShippingFeeError(getApiError(requestError));
+        })
+        .finally(() => {
+          if (active) setIsCalculatingShipping(false);
+        });
+    }, 350);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    token,
+    cartLoadedForToken,
+    cartItems.length,
+    useNewAddress,
+    selectedAddressId,
+    newAddress,
+    notes,
+  ]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    let active = true;
+    retryWithRefreshedSession(token, (validToken) => checkoutService.getAddresses(validToken))
       .then((data) => {
         if (!active) return;
         setAddresses(data);
@@ -93,7 +202,7 @@ export function CheckoutPage() {
     return () => {
       active = false;
     };
-  }, [isDemoCheckout, token]);
+  }, [token]);
 
   const updateNewAddress = (field: keyof NewShippingAddress, value: string) => {
     setNewAddress((current) => ({ ...current, [field]: value }));
@@ -102,103 +211,128 @@ export function CheckoutPage() {
   const submitCheckout = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
-    if (cartItems.length === 0) {
-      setError('Giỏ hàng đang trống.');
-      return;
-    }
-    if (!useNewAddress && !selectedAddressId) {
-      setError('Vui lòng chọn địa chỉ nhận hàng.');
-      return;
-    }
-    if (useNewAddress && Object.values(newAddress).some((value) => !value?.trim())) {
-      setError('Vui lòng nhập đầy đủ thông tin địa chỉ nhận hàng.');
-      return;
-    }
 
-    if (isDemoCheckout) {
-      if (paymentMethod === 2) {
-        setError('Thanh toán VNPay không khả dụng trong chế độ demo.');
+    if (!pendingPaymentOrderId) {
+      if (cartItems.length === 0) {
+        setError('Giỏ hàng đang trống.');
         return;
       }
-      const demoOrderId = `DEMO-${Date.now()}`;
-      const selectedAddress = useNewAddress
-        ? { id: 'demo-address-new', ...newAddress }
-        : addresses.find((address) => address.id === selectedAddressId);
-      if (!selectedAddress) {
-        setError('Không tìm thấy địa chỉ nhận hàng đã chọn.');
+      if (!useNewAddress && !selectedAddressId) {
+        setError('Vui lòng chọn địa chỉ nhận hàng.');
         return;
       }
-
-      demoOrderService.save({
-        payment: {
-          status: 'PENDING',
-          paymentReference: `PAY-COD-${demoOrderId}`,
-        },
-        order: {
-          id: demoOrderId,
-          orderCode: demoOrderId,
-          status: 'PENDING_PAYMENT',
-          createdAt: new Date().toISOString(),
-          subtotal,
-          shippingFee: 0,
-          discount: 0,
-          grandTotal: subtotal,
-          shippingAddress: selectedAddress,
-          items: cartItems.map((item) => ({
-            id: item.variantId,
-            productName: item.productName,
-            sku: item.sku,
-            imageUrl: item.imageUrl,
-            unitPrice: item.unitPrice,
-            quantity: item.quantity,
-            lineTotal: item.unitPrice * item.quantity,
-          })),
-        },
-      });
-      demoCartService.clear();
-      navigate(`/checkout/result?orderId=${encodeURIComponent(demoOrderId)}`);
-      return;
+      const requiredAddressFields = [
+        newAddress.recipientName,
+        newAddress.phone,
+        newAddress.province,
+        newAddress.district,
+        newAddress.ward,
+        newAddress.streetAddress,
+      ];
+      if (useNewAddress && requiredAddressFields.some((value) => !value.trim())) {
+        setError('Vui lòng nhập đầy đủ thông tin địa chỉ nhận hàng.');
+        return;
+      }
+      if (useNewAddress && (!newAddress.provinceCode || !newAddress.districtCode || !newAddress.wardCode)) {
+        setError('Vui lòng chọn đầy đủ Tỉnh/Thành phố, Quận/Huyện và Phường/Xã.');
+        return;
+      }
+      if (!shippingQuote) {
+        setError('Vui lòng chờ tính phí giao hàng trước khi đặt hàng.');
+        return;
+      }
     }
 
     if (!token) {
-      setError('Vui lòng đăng nhập trước khi đặt hàng.');
+      setError('Vui lòng đăng nhập để đặt hàng bằng giỏ hàng của tài khoản.');
       return;
     }
 
     setIsSubmitting(true);
+    let createdOrderId = pendingPaymentOrderId;
     try {
-      let payload: CheckoutRequest;
-      if (useNewAddress && saveNewAddress) {
-        const savedAddress = await checkoutService.createAddress(token, newAddress);
-        payload = { shippingAddressId: savedAddress.id, paymentMethod };
-      } else if (useNewAddress) {
-        payload = { newShippingAddress: newAddress, paymentMethod };
-      } else {
-        payload = { shippingAddressId: selectedAddressId, paymentMethod };
-      }
-
-      const order = await checkoutService.checkout(token, payload);
-      const orderId = order.orderId || order.id;
+      let orderId = pendingPaymentOrderId;
       if (!orderId) {
-        throw new Error('API đặt hàng không trả về mã đơn hàng.');
+        const payload: CheckoutRequest = {
+          addressId: useNewAddress ? null : selectedAddressId,
+          shippingAddress: useNewAddress ? {
+            receiverName: newAddress.recipientName.trim(),
+            receiverPhone: newAddress.phone.trim(),
+            province: newAddress.province.trim(),
+            provinceCode: newAddress.provinceCode!,
+            district: newAddress.district.trim(),
+            districtCode: newAddress.districtCode!,
+            ward: newAddress.ward.trim(),
+            wardCode: newAddress.wardCode!,
+            addressLine: newAddress.streetAddress.trim(),
+          } : null,
+          note: notes.trim() || null,
+        };
+
+        const order = await retryWithRefreshedSession(token, (validToken) => checkoutService.checkout(validToken, payload));
+        orderId = order.id || order.orderId || null;
+        if (!orderId) {
+          throw new Error('API đặt hàng không trả về mã đơn hàng.');
+        }
+        createdOrderId = orderId;
+        setPendingPaymentOrderId(orderId);
+        // The backend clears its cart when it creates the order.
+        notifyCartUpdated();
       }
 
-      if (paymentMethod === 2) {
-        const payment = await checkoutService.initiatePayment(token, orderId);
+      const payment = await retryWithRefreshedSession(token, (validToken) =>
+        checkoutService.initiatePayment(validToken, orderId!, paymentMethod));
+
+      if (paymentMethod === 'VNPAY') {
         if (!payment.paymentUrl) {
           throw new Error('API thanh toán không trả về liên kết thanh toán.');
         }
+        setCartItems([]);
+        setCartSubtotal(0);
+        setShippingQuote(null);
+        setPendingPaymentOrderId(null);
+        notifyCartUpdated();
         window.location.assign(payment.paymentUrl);
         return;
       }
 
-      navigate(`/checkout/result?orderId=${encodeURIComponent(orderId)}`);
+      setCartItems([]);
+      setCartSubtotal(0);
+      setShippingQuote(null);
+      setPendingPaymentOrderId(null);
+      notifyCartUpdated();
+      navigate(`/orders/${encodeURIComponent(orderId)}`, { replace: true });
     } catch (requestError: unknown) {
-      setError(requestError instanceof Error ? requestError.message : getApiError(requestError));
+      const message = axios.isAxiosError(requestError)
+        ? getApiError(requestError)
+        : requestError instanceof Error
+          ? requestError.message
+          : getApiError(requestError);
+      setError(createdOrderId
+        ? `Đơn hàng ${createdOrderId} đã được tạo, nhưng chưa khởi tạo được thanh toán: ${message} Bấm thử lại để tiếp tục thanh toán cho đơn này.`
+        : message);
     } finally {
       setIsSubmitting(false);
     }
   };
+  if (requiresLoginToCheckout) {
+    return (
+      <main className="flex min-h-[calc(100vh-7rem)] items-center justify-center bg-[#f5f7fb] px-4 py-12 text-slate-900">
+        <section className="max-w-lg rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <PackageCheck className="mx-auto h-12 w-12 text-blue-600" />
+          <h1 className="mt-4 text-xl font-extrabold">Đăng nhập để hoàn tất đơn hàng</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Đăng nhập để tải giỏ hàng tài khoản và tiếp tục đặt hàng.</p>
+          <Link to="/login?returnUrl=%2Fcheckout" className="mt-5 inline-flex h-11 items-center rounded-xl bg-blue-600 px-5 text-sm font-bold text-white">
+            Đăng nhập
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
+  if (isLoadingCart || (token && cartLoadedForToken !== token)) {
+    return <main className="min-h-[calc(100vh-7rem)] animate-pulse bg-[#f5f7fb] p-8"><div className="mx-auto h-96 max-w-5xl rounded-2xl bg-white" /></main>;
+  }
 
   if (cartItems.length === 0) {
     return (
@@ -206,6 +340,7 @@ export function CheckoutPage() {
         <section className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
           <PackageCheck className="mx-auto h-12 w-12 text-blue-600" />
           <h1 className="mt-4 text-xl font-bold">Chưa có sản phẩm để thanh toán</h1>
+          {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
           <p className="mt-2 text-sm text-slate-500">Hãy thêm sản phẩm vào giỏ hàng trước khi tiếp tục.</p>
           <Link to="/cart" className="mt-5 inline-flex h-11 items-center rounded-xl bg-blue-600 px-5 text-sm font-bold text-white">
             Về giỏ hàng
@@ -226,12 +361,6 @@ export function CheckoutPage() {
           <h1 className="mt-3 text-2xl font-extrabold">Đặt hàng & Thanh toán</h1>
         </div>
 
-        {isDemoCheckout && (
-          <p className="mb-5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-800">
-            Chế độ demo: thông tin địa chỉ và đơn hàng chỉ dùng để xem thử giao diện, không gửi lên máy chủ.
-          </p>
-        )}
-
         {error && (
           <div role="alert" className="mb-5 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -248,7 +377,7 @@ export function CheckoutPage() {
                 </span>
                 <div>
                   <h2 className="font-bold">Địa chỉ nhận hàng</h2>
-                  <p className="text-xs text-slate-500">Chọn địa chỉ hoặc nhập địa chỉ mới</p>
+            <p className="text-xs text-slate-500">Phí giao hàng sẽ được tính tự động theo địa chỉ</p>
                 </div>
               </div>
 
@@ -290,7 +419,10 @@ export function CheckoutPage() {
                       type="radio"
                       name="shippingAddress"
                       checked={useNewAddress}
-                      onChange={() => setUseNewAddress(true)}
+                      onChange={() => {
+                        setSelectedAddressId('');
+                        setUseNewAddress(true);
+                      }}
                       className="mt-1 accent-blue-600"
                     />
                     <span className="flex items-center gap-2 text-sm font-semibold text-blue-700">
@@ -317,14 +449,12 @@ export function CheckoutPage() {
                         Số nhà, tên đường
                         <input required value={newAddress.streetAddress} onChange={(event) => updateNewAddress('streetAddress', event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-slate-300 px-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
                       </label>
-                      {!isDemoCheckout && (
-                        <label className="flex items-center gap-2 text-sm text-slate-600 sm:col-span-2">
-                          <input type="checkbox" checked={saveNewAddress} onChange={(event) => setSaveNewAddress(event.target.checked)} className="h-4 w-4 accent-blue-600" />
-                          Lưu địa chỉ này vào sổ địa chỉ
-                        </label>
-                      )}
+                      <p className="text-xs text-slate-500 sm:col-span-2">Địa chỉ mới sẽ được lưu cùng đơn hàng.</p>
                     </div>
                   )}
+                  {isCalculatingShipping && <p role="status" className="mt-3 text-sm text-blue-700">Đang tính phí giao hàng…</p>}
+                  {shippingQuote && <p role="status" className="mt-3 text-xs text-emerald-700">Đã cập nhật phí giao hàng theo địa chỉ.</p>}
+                  {shippingFeeError && <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Không tính được phí giao hàng: {shippingFeeError}</p>}
                 </>
               )}
             </section>
@@ -339,19 +469,27 @@ export function CheckoutPage() {
                   <p className="text-xs text-slate-500">Chọn phương thức phù hợp</p>
                 </div>
               </div>
-              <label className={`mb-3 flex cursor-pointer items-center gap-3 rounded-xl border p-4 ${paymentMethod === 1 ? 'border-blue-500 bg-blue-50/60' : 'border-slate-200'}`}>
-                <input type="radio" name="paymentMethod" checked={paymentMethod === 1} onChange={() => setPaymentMethod(1)} className="accent-blue-600" />
+              <label className={`mb-3 flex cursor-pointer items-center gap-3 rounded-xl border p-4 ${paymentMethod === 'COD' ? 'border-blue-500 bg-blue-50/60' : 'border-slate-200'}`}>
+                <input type="radio" name="paymentMethod" checked={paymentMethod === 'COD'} onChange={() => setPaymentMethod('COD')} className="accent-blue-600" />
                 <span className="flex-1">
                   <strong className="block text-sm">Thanh toán khi nhận hàng (COD)</strong>
                   <span className="mt-1 block text-xs text-slate-500">Thanh toán bằng tiền mặt khi nhận hàng</span>
                 </span>
               </label>
-              <label className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 ${paymentMethod === 2 ? 'border-blue-500 bg-blue-50/60' : 'border-slate-200'}`}>
-                <input type="radio" name="paymentMethod" checked={paymentMethod === 2} onChange={() => setPaymentMethod(2)} className="accent-blue-600" />
+              <label className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 ${paymentMethod === 'VNPAY' ? 'border-blue-500 bg-blue-50/60' : 'border-slate-200'}`}>
+                <input type="radio" name="paymentMethod" checked={paymentMethod === 'VNPAY'} onChange={() => setPaymentMethod('VNPAY')} className="accent-blue-600" />
                 <span className="flex-1">
                   <strong className="block text-sm">Thanh toán online (VNPay)</strong>
                   <span className="mt-1 block text-xs text-slate-500">Chuyển đến cổng thanh toán bảo mật sau khi đặt hàng</span>
                 </span>
+              </label>
+            </section>
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+
+              <label className="text-sm font-medium">
+                Ghi chú đơn hàng (tùy chọn)
+                <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
               </label>
             </section>
           </div>
@@ -362,12 +500,13 @@ export function CheckoutPage() {
               {cartItems.map((item) => (
                 <li key={item.variantId} className="flex gap-3">
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-slate-50 p-1">
-                    <img src={item.imageUrl} alt="" className="h-full w-full object-contain" />
+                    {item.imageUrl ? <img src={item.imageUrl} alt="" className="h-full w-full object-contain" /> : <PackageCheck className="h-7 w-7 text-blue-600" />}
                   </div>
                   <div className="min-w-0 flex-1 text-xs">
-                    <strong className="line-clamp-2 text-slate-800">{item.productName}</strong>
-                    <p className="mt-1 text-slate-500">{item.variantLabel} · SL {item.quantity}</p>
-                    <p className="mt-1 font-bold text-slate-700">{formatCurrency(item.unitPrice * item.quantity)}</p>
+                    <strong className="line-clamp-2 text-slate-800">{item.productName || item.variantName}</strong>
+                    {item.productName && item.variantName && <p className="mt-1 text-slate-500">{item.variantName}</p>}
+                    <p className="mt-1 text-slate-500">SKU: {item.sku} · SL {item.quantity}</p>
+                    <p className="mt-1 font-bold text-slate-700">{formatCurrency(item.lineTotal ?? item.price * item.quantity)}</p>
                   </div>
                 </li>
               ))}
@@ -376,21 +515,22 @@ export function CheckoutPage() {
             <div className="mt-5 space-y-3 border-t border-slate-100 pt-4 text-sm">
               <div className="flex justify-between text-slate-600">
                 <span>Tạm tính</span>
-                <span>{formatCurrency(subtotal)}</span>
+                <span>{formatCurrency(shippingQuote?.subtotal ?? subtotal)}</span>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>Phí vận chuyển</span>
-                <span className="text-xs">Tính sau khi xác nhận địa chỉ</span>
+                <span>{isCalculatingShipping ? 'Đang tính…' : shippingQuote ? formatCurrency(shippingQuote.shippingFee) : 'Chọn địa chỉ để tính'}</span>
               </div>
               <div className="flex justify-between border-t border-slate-100 pt-3 font-bold">
                 <span>Tổng cộng</span>
-                <span className="text-lg text-red-600">{formatCurrency(subtotal)}</span>
+                <span className="text-lg text-red-600">{shippingQuote ? formatCurrency(shippingQuote.grandTotal) : '—'}</span>
               </div>
+              {shippingQuote?.includesCodFee && <p className="text-xs text-slate-500">Tổng tiền đã bao gồm phí COD.</p>}
             </div>
 
-            <button type="submit" disabled={isLoadingAddresses || isSubmitting} className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1b64c7] text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+            <button type="submit" disabled={isLoadingAddresses || isLoadingCart || isSubmitting || isCalculatingShipping || (!pendingPaymentOrderId && !shippingQuote)} className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1b64c7] text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
               <PackageCheck className="h-4 w-4" />
-              {isSubmitting ? 'Đang xử lý...' : 'Đặt hàng'}
+              {isSubmitting ? 'Đang xử lý...' : pendingPaymentOrderId ? 'Thử thanh toán lại' : 'Đặt hàng'}
             </button>
             <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-[11px] text-slate-400">
               <ShieldCheck className="h-3.5 w-3.5" />

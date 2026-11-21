@@ -27,7 +27,6 @@ import { demoBrandService } from '../../../services/demoBrandService';
 import { demoCategoryService } from '../../../services/demoCategoryService';
 import { demoProductService } from '../../../services/demoProductService';
 import { demoVariantService } from '../../../services/demoVariantService';
-import { mockProductDetail, MOCK_PRODUCT_ID } from '../../../mocks/productDetailMock';
 import { shouldUseDemoServices } from '../../../shared/api/serviceMode';
 
 const PAGE_SIZE = 10;
@@ -98,9 +97,8 @@ export function ProductManagementPage() {
     productId: '',
     sku: '',
     price: 0,
-    attributesSummary: '',
+    variantName: '',
     status: 'ACTIVE',
-    stockQuantity: 0,
   });
   const [imageUrl, setImageUrl] = useState('');
   const [managerError, setManagerError] = useState<string | null>(null);
@@ -119,12 +117,12 @@ export function ProductManagementPage() {
 
   useEffect(() => {
     let active = true;
-    const request = token
-      ? Promise.all([catalogService.getCategories(token), catalogService.getBrands(token)])
-      : Promise.resolve().then(() => [
+    const request = isDemo
+      ? Promise.resolve().then(() => [
           demoCategoryService.getAll(),
           demoBrandService.getAll(),
-        ] as const);
+        ] as const)
+      : Promise.all([catalogService.getCategories(token), catalogService.getBrands(token)]);
 
     request
       .then(([categoryData, brandData]) => {
@@ -144,21 +142,12 @@ export function ProductManagementPage() {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [token, isDemo]);
 
   useEffect(() => {
     let active = true;
-    const request = token
-      ? catalogService.getProducts({
-          pageIndex,
-          pageSize: PAGE_SIZE,
-          searchTerm: searchTerm || undefined,
-        }).then((result) => ({
-          items: result.items,
-          totalCount: result.totalCount,
-          totalPages: Math.max(1, result.totalPages || 1),
-        }))
-      : Promise.resolve().then(() => {
+    const request = isDemo
+      ? Promise.resolve().then(() => {
           const allProducts = demoProductService.getAll();
           const normalizedSearch = searchTerm.toLocaleLowerCase();
           const filtered = normalizedSearch
@@ -175,7 +164,16 @@ export function ProductManagementPage() {
             totalCount: filtered.length,
             totalPages: Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)),
           };
-        });
+        })
+      : catalogService.getProducts({
+          pageIndex,
+          pageSize: PAGE_SIZE,
+          searchTerm: searchTerm || undefined,
+        }).then((result) => ({
+          items: result.items,
+          totalCount: result.totalCount,
+          totalPages: Math.max(1, result.totalPages || 1),
+        }));
 
     request
       .then((result) => {
@@ -350,21 +348,13 @@ export function ProductManagementPage() {
       productId: product.id,
       sku: '',
       price: 0,
-      attributesSummary: '',
+      variantName: '',
       status: 'ACTIVE',
-      stockQuantity: 0,
     });
     setImageUrl('');
     setIsLoadingManager(true);
     try {
-      if (isDemo && product.id === MOCK_PRODUCT_ID) {
-        const storedVariants = demoVariantService.getVariants(product.id);
-        const storedImages = demoVariantService.getImages(product.id);
-        if (storedVariants.length === 0) demoVariantService.saveVariants(product.id, mockProductDetail.variants);
-        if (storedImages.length === 0) demoVariantService.saveImages(product.id, mockProductDetail.images);
-        setVariants(demoVariantService.getVariants(product.id));
-        setImages(demoVariantService.getImages(product.id));
-      } else if (isDemo) {
+      if (isDemo) {
         setVariants(demoVariantService.getVariants(product.id));
         setImages(demoVariantService.getImages(product.id));
       } else {
@@ -394,9 +384,8 @@ export function ProductManagementPage() {
       productId: variantTarget.id,
       sku: variant.sku,
       price: variant.price,
-      attributesSummary: variant.attributesSummary,
+      variantName: variant.variantName,
       status: variant.status?.toUpperCase() === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
-      stockQuantity: variant.stockQuantity ?? 0,
     });
   };
 
@@ -404,9 +393,9 @@ export function ProductManagementPage() {
     event.preventDefault();
     if (!variantTarget) return;
     const sku = variantForm.sku.trim();
-    const attributesSummary = variantForm.attributesSummary.trim();
-    if (!sku || !attributesSummary) {
-      setManagerError('Vui lòng nhập SKU và cấu hình biến thể.');
+    const variantName = variantForm.variantName.trim();
+    if (!sku || !variantName) {
+      setManagerError('Vui lòng nhập SKU và tên cấu hình biến thể.');
       return;
     }
     if (!Number.isFinite(variantForm.price) || variantForm.price < 0) {
@@ -417,8 +406,7 @@ export function ProductManagementPage() {
       ...variantForm,
       productId: variantTarget.id,
       sku,
-      attributesSummary,
-      stockQuantity: Number.isInteger(variantForm.stockQuantity) ? variantForm.stockQuantity : 0,
+      variantName,
     };
     setIsLoadingManager(true);
     setManagerError(null);
@@ -439,9 +427,8 @@ export function ProductManagementPage() {
         productId: variantTarget.id,
         sku: '',
         price: 0,
-        attributesSummary: '',
+        variantName: '',
         status: 'ACTIVE',
-        stockQuantity: 0,
       });
     } catch (saveError: unknown) {
       setManagerError(getApiError(saveError));
@@ -547,8 +534,8 @@ export function ProductManagementPage() {
     product.brandName || brandNameById.get(product.brandId ?? '') || '—';
 
   return (
-    <main className="min-h-[calc(100vh-7rem)] bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
+    <main className="min-h-[calc(100vh-68px)] bg-[#f5f7fb] px-6 py-6 text-slate-900 sm:px-8">
+      <div className="mx-auto w-full max-w-[1600px]">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">Quản trị hệ thống</p>
@@ -788,7 +775,7 @@ export function ProductManagementPage() {
                       <div key={variant.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="truncate text-sm font-bold">{variant.attributesSummary}</p>
+                            <p className="truncate text-sm font-bold">{variant.variantName}</p>
                             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${variant.status?.toUpperCase() === 'INACTIVE' ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-700'}`}>
                               {variant.status?.toUpperCase() === 'INACTIVE' ? 'Ngừng' : 'Đang bán'}
                             </span>
@@ -812,17 +799,14 @@ export function ProductManagementPage() {
                 <form onSubmit={submitVariant} className="mt-4 rounded-xl border border-slate-200 p-4">
                   <h4 className="text-sm font-bold">{editingVariantId ? 'Cập nhật biến thể' : 'Thêm biến thể mới'}</h4>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <label className="text-xs font-semibold">Cấu hình
-                      <input value={variantForm.attributesSummary} onChange={(event) => setVariantForm((current) => ({ ...current, attributesSummary: event.target.value }))} placeholder="Ví dụ: 256 GB · Đen" className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-blue-500" />
+                    <label className="text-xs font-semibold">Tên cấu hình (ví dụ: 256GB · Đen)
+                      <input value={variantForm.variantName} onChange={(event) => setVariantForm((current) => ({ ...current, variantName: event.target.value }))} placeholder="Ví dụ: 256 GB · Đen" className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-blue-500" />
                     </label>
                     <label className="text-xs font-semibold">SKU
                       <input value={variantForm.sku} onChange={(event) => setVariantForm((current) => ({ ...current, sku: event.target.value }))} placeholder="TP-PRO-256-BLK" className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-blue-500" />
                     </label>
                     <label className="text-xs font-semibold">Giá (VNĐ)
                       <input type="number" min={0} step={1000} value={variantForm.price} onChange={(event) => setVariantForm((current) => ({ ...current, price: Number(event.target.value) }))} className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-blue-500" />
-                    </label>
-                    <label className="text-xs font-semibold">Tồn kho
-                      <input type="number" min={0} step={1} value={variantForm.stockQuantity ?? 0} onChange={(event) => setVariantForm((current) => ({ ...current, stockQuantity: Number(event.target.value) }))} className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-blue-500" />
                     </label>
                     <label className="text-xs font-semibold sm:col-span-2">Trạng thái
                       <select value={variantForm.status} onChange={(event) => setVariantForm((current) => ({ ...current, status: event.target.value as 'ACTIVE' | 'INACTIVE' }))} className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal outline-none focus:border-blue-500">
@@ -834,7 +818,7 @@ export function ProductManagementPage() {
                   <div className="mt-3 flex justify-end gap-2">
                     {editingVariantId && <button type="button" onClick={() => {
                       setEditingVariantId(null);
-                      setVariantForm({ productId: variantTarget.id, sku: '', price: 0, attributesSummary: '', status: 'ACTIVE', stockQuantity: 0 });
+                      setVariantForm({ productId: variantTarget.id, sku: '', price: 0, variantName: '', status: 'ACTIVE' });
                     }} className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-semibold">Hủy sửa</button>}
                     <button type="submit" disabled={isLoadingManager} className="h-9 rounded-lg bg-blue-600 px-4 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50">
                       {editingVariantId ? 'Cập nhật' : 'Thêm biến thể'}
