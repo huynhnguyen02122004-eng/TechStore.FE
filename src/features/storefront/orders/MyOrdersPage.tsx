@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { checkoutService, type OrderDetailsResponse } from '../../../services/checkoutService';
 import { demoOrderService } from '../../../services/demoOrderService';
+import { AccountSidebar } from '../../../shared/layouts/AccountSidebar';
 
 const orderStatuses = [
   { value: '', label: 'Tất cả đơn hàng' },
@@ -104,13 +105,15 @@ export function MyOrdersPage() {
   }, [orders, search]);
 
   return (
-    <main className="min-h-[calc(100vh-7rem)] bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <main className="min-h-[calc(100vh-7rem)] bg-slate-50/70 px-4 py-6 text-slate-900 sm:px-6 sm:py-8 lg:px-8">
+      <div className="mx-auto grid w-full max-w-[1320px] items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <AccountSidebar />
+        <div className="min-w-0">
+        <div className="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">Tài khoản của bạn</p>
-            <h1 className="mt-1 text-2xl font-extrabold">Đơn hàng của tôi</h1>
-            <p className="mt-1 text-sm text-slate-500">Theo dõi trạng thái và xem lại các đơn hàng đã đặt.</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">Tài khoản của bạn</p>
+            <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-[28px]">Đơn hàng của tôi</h1>
+            <p className="mt-1.5 text-sm text-slate-500">Theo dõi trạng thái và xem lại các đơn hàng đã đặt.</p>
           </div>
           <label className="relative block w-full sm:max-w-xs">
             <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -120,7 +123,7 @@ export function MyOrdersPage() {
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Tìm theo mã đơn hàng"
               aria-label="Tìm theo mã đơn hàng"
-              className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm shadow-sm outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
           </label>
         </div>
@@ -131,24 +134,26 @@ export function MyOrdersPage() {
           </p>
         )}
 
-        <div className="mb-5 flex gap-2 overflow-x-auto pb-2" role="tablist" aria-label="Lọc đơn hàng theo trạng thái">
-          {orderStatuses.map((status) => (
-            <button
-              key={status.value || 'all'}
-              type="button"
-              role="tab"
-              aria-selected={selectedStatus === status.value}
-              onClick={() => setSelectedStatus(status.value)}
-              className={`shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition ${
-                selectedStatus === status.value
-                  ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700'
-              }`}
-            >
-              {status.label}
-            </button>
-          ))}
-        </div>
+        <section className="mb-5 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          <div className="flex gap-2 overflow-x-auto px-4 py-3" role="tablist" aria-label="Lọc đơn hàng theo trạng thái">
+            {orderStatuses.map((status) => (
+              <button
+                key={status.value || 'all'}
+                type="button"
+                role="tab"
+                aria-selected={selectedStatus === status.value}
+                onClick={() => setSelectedStatus(status.value)}
+                className={`shrink-0 rounded-lg border px-3.5 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                  selectedStatus === status.value
+                    ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700'
+                }`}
+              >
+                {status.label}
+              </button>
+            ))}
+          </div>
+        </section>
 
         {error && (
           <div role="alert" className="mb-5 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -162,7 +167,7 @@ export function MyOrdersPage() {
             {[1, 2].map((item) => <div key={item} className="h-52 animate-pulse rounded-2xl border border-slate-200 bg-white" />)}
           </div>
         ) : visibleOrders.length === 0 ? (
-          <section className="rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
+          <section className="rounded-2xl border border-slate-200/80 bg-white px-6 py-16 text-center shadow-sm">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-blue-600">
               {error ? <ClipboardList className="h-8 w-8" /> : <ShoppingBag className="h-8 w-8" />}
             </div>
@@ -176,9 +181,11 @@ export function MyOrdersPage() {
           </section>
         ) : (
           <section className="space-y-4">
-            <p className="text-sm text-slate-500" aria-live="polite">
-              Có <strong className="text-slate-800">{visibleOrders.length}</strong> đơn hàng
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-slate-500" aria-live="polite">
+                Có <strong className="text-slate-800">{visibleOrders.length}</strong> đơn hàng
+              </p>
+            </div>
             {visibleOrders.map((order) => {
               const status = order.status?.toUpperCase() ?? '';
               const items = order.items ?? [];
@@ -235,6 +242,7 @@ export function MyOrdersPage() {
             })}
           </section>
         )}
+        </div>
       </div>
     </main>
   );

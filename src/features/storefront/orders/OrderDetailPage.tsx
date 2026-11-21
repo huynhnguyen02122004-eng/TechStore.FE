@@ -18,6 +18,7 @@ import {
   type OrderDetailsResponse,
   type ShipmentDetailsResponse,
 } from '../../../services/checkoutService';
+import { retryWithRefreshedSession } from '../../../services/authService';
 import { demoOrderService } from '../../../services/demoOrderService';
 
 const orderStatusLabels: Record<string, string> = {
@@ -70,7 +71,8 @@ const formatStatus = (value?: string) => {
 
 const errorMessage = (error: unknown) => {
   if (axios.isAxiosError<{ detail?: string; message?: string }>(error)) {
-    return error.response?.data?.detail || error.response?.data?.message || 'Không thể tải thông tin đơn hàng.';
+    return error.response?.data?.detail || error.response?.data?.message ||
+      (error.response ? `Không thể tải thông tin đơn hàng (HTTP ${error.response.status}).` : 'Không thể kết nối để tải thông tin đơn hàng.');
   }
   return error instanceof Error ? error.message : 'Không thể tải thông tin đơn hàng.';
 };
@@ -111,10 +113,10 @@ export function OrderDetailPage() {
           if (!result) throw new Error('Không tìm thấy dữ liệu đơn demo trong phiên hiện tại.');
           return result.order;
         })
-      : checkoutService.getOrderById(token!, orderId);
+      : retryWithRefreshedSession(token!, (validToken) => checkoutService.getOrderById(validToken, orderId));
     const shipmentRequest = isDemoOrder
       ? Promise.resolve(null)
-      : checkoutService.getShipmentByOrderId(token!, orderId);
+      : retryWithRefreshedSession(token!, (validToken) => checkoutService.getShipmentByOrderId(validToken, orderId));
 
     Promise.allSettled([orderRequest, shipmentRequest])
       .then(([orderResult, shipmentResult]) => {

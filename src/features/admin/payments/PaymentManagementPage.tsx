@@ -85,9 +85,9 @@ export function PaymentManagementPage() {
 
   useEffect(() => {
     let active = true;
-    const request = token
-      ? checkoutService.getAdminPayments(token)
-      : Promise.resolve().then(() => demoPaymentService.getAll());
+    const request = isDemo
+      ? Promise.resolve().then(() => demoPaymentService.getAll())
+      : checkoutService.getAdminPayments(token);
     request
       .then((data) => {
         if (!active) return;
@@ -103,7 +103,7 @@ export function PaymentManagementPage() {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [token, isDemo]);
 
   const visiblePayments = useMemo(() => {
     const normalized = search.trim().toLocaleLowerCase();
@@ -162,8 +162,8 @@ export function PaymentManagementPage() {
   };
 
   return (
-    <main className="min-h-[calc(100vh-7rem)] bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
+    <main className="min-h-[calc(100vh-68px)] bg-[#f5f7fb] px-6 py-6 text-slate-900 sm:px-8">
+      <div className="mx-auto w-full max-w-[1600px]">
         <div className="mb-6">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">Quản trị hệ thống</p>
           <h1 className="mt-1 text-2xl font-extrabold">Quản lý thanh toán</h1>

@@ -3,10 +3,10 @@ import type { InventoryAdjustPayload, InventoryItem } from './inventoryService';
 const STORAGE_KEY = 'techstore-demo-inventory';
 
 const initialItems: InventoryItem[] = [
-  { variantId: 'mock-variant-256-black', productId: 'mock-iphone', productCode: 'SP-001', productName: 'TechPhone Pro', variantName: '256 GB · Đen', sku: 'TP-PRO-256-BLK', stockQuantity: 24, lowStockThreshold: 10 },
-  { variantId: 'mock-variant-256-silver', productId: 'mock-iphone', productCode: 'SP-001', productName: 'TechPhone Pro', variantName: '256 GB · Bạc', sku: 'TP-PRO-256-SLV', stockQuantity: 8, lowStockThreshold: 10 },
-  { variantId: 'mock-variant-512-black', productId: 'mock-iphone', productCode: 'SP-001', productName: 'TechPhone Pro', variantName: '512 GB · Đen', sku: 'TP-PRO-512-BLK', stockQuantity: 3, lowStockThreshold: 5 },
-  { variantId: 'mock-variant-1tb-burgundy', productId: 'mock-iphone', productCode: 'SP-001', productName: 'TechPhone Pro', variantName: '1 TB · Đỏ Burgundy', sku: 'TP-PRO-1TB-BRG', stockQuantity: 0, lowStockThreshold: 5 },
+  { variantId: 'mock-variant-256-black', productId: 'demo-product-phone', productCode: 'SP-001', productName: 'TechPhone Pro', variantName: '256 GB · Đen', sku: 'TP-PRO-256-BLK', stockQuantity: 24, lowStockThreshold: 10 },
+  { variantId: 'mock-variant-256-silver', productId: 'demo-product-phone', productCode: 'SP-001', productName: 'TechPhone Pro', variantName: '256 GB · Bạc', sku: 'TP-PRO-256-SLV', stockQuantity: 8, lowStockThreshold: 10 },
+  { variantId: 'mock-variant-512-black', productId: 'demo-product-phone', productCode: 'SP-001', productName: 'TechPhone Pro', variantName: '512 GB · Đen', sku: 'TP-PRO-512-BLK', stockQuantity: 3, lowStockThreshold: 5 },
+  { variantId: 'mock-variant-1tb-burgundy', productId: 'demo-product-phone', productCode: 'SP-001', productName: 'TechPhone Pro', variantName: '1 TB · Đỏ Burgundy', sku: 'TP-PRO-1TB-BRG', stockQuantity: 0, lowStockThreshold: 5 },
   { variantId: 'demo-variant-laptop', productId: 'demo-product-laptop', productCode: 'SP-002', productName: 'Laptop Pro 14', variantName: '16 GB · 512 GB', sku: 'LP-PRO-14-512', stockQuantity: 14, lowStockThreshold: 5 },
 ];
 

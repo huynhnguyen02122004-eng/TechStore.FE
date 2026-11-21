@@ -23,3 +23,13 @@ body {
 #root {
   min-height: 100vh;
 }
+
+@keyframes storefront-marquee {
+  from {
+    transform: translateX(-50%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}

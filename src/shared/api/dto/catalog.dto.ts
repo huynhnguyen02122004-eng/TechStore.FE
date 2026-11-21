@@ -64,20 +64,30 @@ export interface ProductQuery {
 
 export interface ProductVariantResponse {
   id: string;
+  productId?: string;
   sku: string;
+  /** Backend field: human-readable variant name (e.g. "256GB · Đen") */
+  variantName: string;
   price: number;
-  attributesSummary: string;
+  weightGrams?: number;
+  lengthCm?: number;
+  widthCm?: number;
+  heightCm?: number;
   status?: string;
-  stockQuantity?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ProductVariantMutation {
   productId: string;
   sku: string;
+  variantName: string;
   price: number;
-  attributesSummary: string;
+  weightGrams?: number;
+  lengthCm?: number;
+  widthCm?: number;
+  heightCm?: number;
   status?: 'ACTIVE' | 'INACTIVE';
-  stockQuantity?: number;
 }
 
 export interface ProductImageMutation {
@@ -96,7 +106,9 @@ export interface ProductImageResponse {
 
 export interface VariantSpecificationResponse {
   id?: string;
-  specKey: string;
+  variantId?: string;
+  /** Backend field name */
+  specName: string;
   specValue: string;
-  displayOrder?: number;
+  unit?: string;
 }

@@ -7,7 +7,7 @@ const STORAGE_KEY = 'techstore-demo-products';
 
 const initialProducts: ProductResponse[] = [
   {
-    id: 'mock-iphone',
+    id: 'demo-product-phone',
     name: 'TechPhone Pro',
     slug: 'techphone-pro',
     categoryId: 'demo-category-phones',

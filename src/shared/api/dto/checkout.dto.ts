@@ -5,6 +5,7 @@ export interface ShippingAddress extends NewShippingAddress {
 export interface NewShippingAddress {
   recipientName: string;
   phone: string;
+  email?: string;
   province: string;
   district: string;
   ward: string;
@@ -20,17 +21,63 @@ export interface LocationOption {
   name: string;
 }
 
+export type PaymentMethod = 'COD' | 'VNPAY';
+
+export interface CheckoutShippingAddressRequest {
+  receiverName: string;
+  receiverPhone: string;
+  province: string;
+  provinceCode: string;
+  district: string;
+  districtCode: string;
+  ward: string;
+  wardCode: string;
+  addressLine: string;
+}
+
 export interface CheckoutRequest {
-  shippingAddressId?: string;
-  newShippingAddress?: NewShippingAddress;
-  paymentMethod: 1 | 2;
+  addressId: string | null;
+  shippingAddress: CheckoutShippingAddressRequest | null;
+  note: string | null;
+}
+
+export interface ShippingFeeAddressRequest {
+  receiverName: string;
+  receiverPhone: string;
+  province: string;
+  provinceCode: string;
+  district: string;
+  districtCode: string;
+  ward: string;
+  wardCode: string;
+  addressLine: string;
+}
+
+export interface ShippingFeeRequest {
+  addressId?: string | null;
+  shippingAddress?: ShippingFeeAddressRequest | null;
+  note?: string;
+}
+
+export interface ShippingFeeResponse {
+  subtotal: number;
+  shippingFee: number;
+  grandTotal: number;
+  includesCodFee: boolean;
 }
 
 export interface CheckoutResponse {
-  id?: string;
+  id: string;
   orderId?: string;
-  orderCode?: string;
-  grandTotal?: number;
+  userId?: string;
+  subtotal?: number;
+  subTotal?: number;
+  shippingFee: number;
+  grandTotal: number;
+  shippingAddressId?: string;
+  createdAt: string;
+  status?: string;
+  items?: OrderItemResponse[];
 }
 
 export interface PaymentInitiationResponse {
@@ -40,6 +87,7 @@ export interface PaymentInitiationResponse {
 
 export interface OrderItemResponse {
   id?: string;
+  variantId?: string;
   productName?: string;
   name?: string;
   sku?: string;
@@ -47,10 +95,17 @@ export interface OrderItemResponse {
   unitPrice?: number;
   quantity?: number;
   lineTotal?: number;
+  totalPrice?: number;
+  weightGrams?: number;
+  lengthCm?: number;
+  widthCm?: number;
+  heightCm?: number;
 }
 
 export interface OrderDetailsResponse {
   id: string;
+  orderId?: string;
+  userId?: string;
   orderCode?: string;
   status?: string;
   createdAt?: string;
@@ -60,11 +115,13 @@ export interface OrderDetailsResponse {
   paymentMethod?: 1 | 2 | 'COD' | 'VNPAY' | string;
   paymentStatus?: string;
   subtotal?: number;
+  subTotal?: number;
   shippingFee?: number;
   discount?: number;
   grandTotal?: number;
   paymentExpiresAt?: string;
   shippingAddress?: ShippingAddress | string;
+  shippingAddressId?: string;
   items?: OrderItemResponse[];
 }
 

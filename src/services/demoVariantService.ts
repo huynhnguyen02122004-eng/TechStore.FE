@@ -19,10 +19,9 @@ export const demoVariantService = {
     const created: ProductVariantResponse = {
       id: `demo-variant-${Date.now()}`,
       sku: variant.sku,
+      variantName: variant.variantName,
       price: variant.price,
-      attributesSummary: variant.attributesSummary,
       status: variant.status ?? 'ACTIVE',
-      stockQuantity: variant.stockQuantity,
     };
     const variants = [...demoVariantService.getVariants(productId), created];
     demoVariantService.saveVariants(productId, variants);
@@ -31,7 +30,7 @@ export const demoVariantService = {
   updateVariant(productId: string, variantId: string, variant: ProductVariantMutation): ProductVariantResponse[] {
     const variants = demoVariantService.getVariants(productId).map((item) =>
       item.id === variantId
-        ? { ...item, sku: variant.sku, price: variant.price, attributesSummary: variant.attributesSummary, status: variant.status ?? 'ACTIVE', stockQuantity: variant.stockQuantity }
+        ? { ...item, sku: variant.sku, price: variant.price, variantName: variant.variantName, status: variant.status ?? 'ACTIVE' }
         : item,
     );
     demoVariantService.saveVariants(productId, variants);

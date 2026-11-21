@@ -1,5 +1,5 @@
 import { useState, type FC, type ChangeEvent, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Eye,
   EyeOff,
@@ -17,9 +17,19 @@ import {
   Truck,
 } from 'lucide-react';
 import { authService, saveAuthSession, type RegisterRequest } from '../../../services/authService';
+import { addOrIncrementAccountCartItem, getAccountCart, type CartResponse } from '../../../services/cartService';
 
 export const RegisterPage: FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const returnUrl = searchParams.get('returnUrl');
+  const addVariantId = searchParams.get('addVariantId');
+  const redirectAfterRegister = returnUrl?.startsWith('/') && !returnUrl.startsWith('//') ? returnUrl : '/';
+  const loginParams = new URLSearchParams();
+  if (returnUrl) loginParams.set('returnUrl', returnUrl);
+  if (addVariantId) loginParams.set('addVariantId', addVariantId);
+  const loginUrl = `/login${loginParams.size ? `?${loginParams.toString()}` : ''}`;
 
   const [formData, setFormData] = useState<RegisterRequest>({
     fullName: '',
@@ -122,8 +132,24 @@ export const RegisterPage: FC = () => {
       const response = await authService.register(payload);
 
       saveAuthSession(response, true);
-
-      navigate('/');
+      let accountCart: CartResponse | undefined;
+      try {
+        accountCart = await getAccountCart(response.accessToken);
+      } catch {
+        // The account cart page will retry loading the API cart after navigation.
+      }
+      if (addVariantId) {
+        try {
+          await addOrIncrementAccountCartItem(response.accessToken, addVariantId, 1, accountCart);
+        } catch {
+          navigate('/cart?cartError=add', { replace: true });
+          return;
+        }
+      }
+      navigate(redirectAfterRegister, {
+        replace: true,
+        state: addVariantId ? { accountCartItemAdded: true } : undefined,
+      });
     } catch (error: any) {
       if (error.response) {
         const { status, data } = error.response;
@@ -245,7 +271,7 @@ export const RegisterPage: FC = () => {
             <div className="flex items-center justify-between mb-4">
               <div className="inline-flex p-1 bg-slate-800/80 rounded-xl border border-slate-700/70">
                 <Link
-                  to="/login"
+                  to={loginUrl}
                   className="px-4 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition"
                 >
                   Đăng nhập
@@ -639,7 +665,7 @@ export const RegisterPage: FC = () => {
           {/* Bottom Switcher */}
           <div className="mt-6 text-center text-xs text-slate-400">
             Đã có tài khoản TechStore?{' '}
-            <Link to="/login" className="font-semibold text-blue-400 hover:text-blue-300 hover:underline">
+            <Link to={loginUrl} className="font-semibold text-blue-400 hover:text-blue-300 hover:underline">
               Đăng nhập ngay
             </Link>
           </div>

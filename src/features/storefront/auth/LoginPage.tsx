@@ -1,5 +1,5 @@
 import { useState, type FC, type ChangeEvent, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Eye,
   EyeOff,
@@ -15,9 +15,19 @@ import {
   Headphones,
 } from 'lucide-react';
 import { authService, saveAuthSession, type LoginRequest } from '../../../services/authService';
+import { addOrIncrementAccountCartItem, getAccountCart, type CartResponse } from '../../../services/cartService';
 
 export const LoginPage: FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const returnUrl = searchParams.get('returnUrl');
+  const addVariantId = searchParams.get('addVariantId');
+  const redirectAfterLogin = returnUrl?.startsWith('/') && !returnUrl.startsWith('//') ? returnUrl : '/';
+  const registerParams = new URLSearchParams();
+  if (returnUrl) registerParams.set('returnUrl', returnUrl);
+  if (addVariantId) registerParams.set('addVariantId', addVariantId);
+  const registerUrl = `/register${registerParams.size ? `?${registerParams.toString()}` : ''}`;
 
   const [formData, setFormData] = useState<LoginRequest>({
     email: '',
@@ -70,8 +80,24 @@ export const LoginPage: FC = () => {
       const response = await authService.login(formData);
 
       saveAuthSession(response, rememberMe);
-
-      navigate('/');
+      let accountCart: CartResponse | undefined;
+      try {
+        accountCart = await getAccountCart(response.accessToken);
+      } catch {
+        // The account cart page will retry loading the API cart after navigation.
+      }
+      if (addVariantId) {
+        try {
+          await addOrIncrementAccountCartItem(response.accessToken, addVariantId, 1, accountCart);
+        } catch {
+          navigate('/cart?cartError=add', { replace: true });
+          return;
+        }
+      }
+      navigate(redirectAfterLogin, {
+        replace: true,
+        state: addVariantId ? { accountCartItemAdded: true } : undefined,
+      });
     } catch (error: any) {
       if (error.response) {
         const { status, data } = error.response;
@@ -196,7 +222,7 @@ export const LoginPage: FC = () => {
                   Đăng nhập
                 </button>
                 <Link
-                  to="/register"
+                  to={registerUrl}
                   className="px-4 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition"
                 >
                   Đăng ký
@@ -408,7 +434,7 @@ export const LoginPage: FC = () => {
           {/* Bottom Switcher */}
           <div className="mt-8 text-center text-xs text-slate-400">
             Chưa có tài khoản TechStore?{' '}
-            <Link to="/register" className="font-semibold text-blue-400 hover:text-blue-300 hover:underline">
+            <Link to={registerUrl} className="font-semibold text-blue-400 hover:text-blue-300 hover:underline">
               Đăng ký tài khoản mới
             </Link>
           </div>

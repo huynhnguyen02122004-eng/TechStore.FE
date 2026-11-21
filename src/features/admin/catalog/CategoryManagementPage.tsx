@@ -259,12 +259,12 @@ export function CategoryManagementPage() {
   };
 
   return (
-    <main className="min-h-[calc(100vh-7rem)] bg-[#f5f7fb] px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
+    <main className="min-h-[calc(100vh-68px)] bg-[#f5f7fb] px-6 py-6 text-slate-900 sm:px-8">
+      <div className="mx-auto w-full max-w-[1600px]">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">Quản trị hệ thống</p>
-            <h1 className="mt-1 text-2xl font-extrabold">Quản lý danh mục</h1>
+            <h1 className="mt-1 text-2xl font-black">Quản lý danh mục</h1>
             <p className="mt-1 text-sm text-slate-500">Tạo cấu trúc danh mục cha – con cho sản phẩm.</p>
           </div>
           <button type="button" onClick={openCreateForm} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700">
@@ -288,7 +288,7 @@ export function CategoryManagementPage() {
           <p role="status" className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</p>
         )}
 
-        <div className="mb-5 grid gap-3 sm:grid-cols-2">
+        <div className="mb-5 grid grid-cols-2 gap-4 md:grid-cols-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-medium text-slate-500">Tổng danh mục</p>
             <p className="mt-1 text-2xl font-extrabold">{categories.length}</p>
