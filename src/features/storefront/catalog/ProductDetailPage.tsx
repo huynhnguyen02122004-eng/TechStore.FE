@@ -77,7 +77,7 @@ export function ProductDetailPage() {
           [...imageData].sort(
             (a, b) =>
               Number(Boolean(b.isPrimary)) - Number(Boolean(a.isPrimary)) ||
-              (a.displayOrder ?? 0) - (b.displayOrder ?? 0),
+              (a.sortOrder ?? a.displayOrder ?? 0) - (b.sortOrder ?? b.displayOrder ?? 0),
           ),
         );
       })

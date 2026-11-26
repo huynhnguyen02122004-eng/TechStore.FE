@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Eye,
   EyeOff,
-  Laptop,
   ShieldCheck,
   Lock,
   Mail,
@@ -188,9 +187,7 @@ export const RegisterPage: FC = () => {
           {/* Top Brand Logo */}
           <div className="relative z-10">
             <Link to="/" className="inline-flex items-center gap-3 group">
-              <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform duration-300">
-                <Laptop className="w-6 h-6 text-white" />
-              </div>
+              <img src="/techstore-mark.svg" alt="" className="h-12 w-12 drop-shadow-lg transition-transform duration-300 group-hover:scale-105" />
               <div className="flex flex-col">
                 <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-blue-100 to-blue-300 bg-clip-text text-transparent">
                   TechStore

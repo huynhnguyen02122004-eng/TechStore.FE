@@ -1,8 +1,10 @@
 export interface CategoryResponse {
   id: string;
   name: string;
+  slug?: string;
   description?: string;
   parentId?: string | null;
+  status?: 'ACTIVE' | 'INACTIVE' | string;
   children?: CategoryResponse[];
 }
 
@@ -15,6 +17,9 @@ export interface CategoryMutation {
 export interface BrandResponse {
   id: string;
   name: string;
+  slug?: string;
+  logoUrl?: string | null;
+  status?: 'ACTIVE' | 'INACTIVE' | string;
 }
 
 export interface BrandMutation {
@@ -48,6 +53,8 @@ export interface ProductMutation {
 export interface PagedResult<T> {
   items: T[];
   pageIndex: number;
+  pageNumber?: number;
+  pageSize?: number;
   totalPages: number;
   totalCount: number;
   hasPreviousPage: boolean;
@@ -55,11 +62,14 @@ export interface PagedResult<T> {
 }
 
 export interface ProductQuery {
+  pageNumber?: number;
   pageIndex?: number;
   pageSize?: number;
   categoryId?: string;
   brandId?: string;
   searchTerm?: string;
+  sortBy?: string;
+  isDescending?: boolean;
 }
 
 export interface ProductVariantResponse {
@@ -99,9 +109,11 @@ export interface ProductImageMutation {
 
 export interface ProductImageResponse {
   id?: string;
+  productId?: string;
   imageUrl: string;
   isPrimary?: boolean;
   displayOrder?: number;
+  sortOrder?: number;
 }
 
 export interface VariantSpecificationResponse {
