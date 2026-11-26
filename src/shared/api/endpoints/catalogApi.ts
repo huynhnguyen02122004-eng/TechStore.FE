@@ -33,7 +33,9 @@ export type {
 
 interface ProductPagePayload {
   items?: ProductResponse[];
+  pageNumber?: number;
   pageIndex?: number;
+  pageSize?: number;
   totalPages?: number;
   totalCount?: number;
   hasPreviousPage?: boolean;
@@ -51,7 +53,10 @@ export const catalogService = {
   getCategories: async (token?: string): Promise<CategoryResponse[]> => {
     const response = await axiosInstance.get<CategoryResponse[] | { items: CategoryResponse[] }>(
       '/categories',
-      token ? withToken(token) : undefined,
+      {
+        params: { pageSize: 100 },
+        ...(token ? withToken(token) : {}),
+      },
     );
     return unwrapArray(response.data);
   },
@@ -72,7 +77,10 @@ export const catalogService = {
   getBrands: async (token?: string): Promise<BrandResponse[]> => {
     const response = await axiosInstance.get<BrandResponse[] | { items: BrandResponse[] }>(
       '/brands',
-      token ? withToken(token) : undefined,
+      {
+        params: { pageSize: 100 },
+        ...(token ? withToken(token) : {}),
+      },
     );
     return unwrapArray(response.data);
   },
@@ -93,23 +101,29 @@ export const catalogService = {
   getProducts: async (query: ProductQuery): Promise<PagedResult<ProductResponse>> => {
     const response = await axiosInstance.get<ProductPagePayload>('/products', {
       params: {
-        pageIndex: query.pageIndex ?? 1,
+        pageNumber: query.pageNumber ?? query.pageIndex ?? 1,
         pageSize: query.pageSize ?? 12,
         categoryId: query.categoryId || undefined,
         brandId: query.brandId || undefined,
         searchTerm: query.searchTerm?.trim() || undefined,
+        sortBy: query.sortBy || undefined,
+        isDescending: query.isDescending ?? false,
       },
     });
     const data = response.data;
     const items = data.items ?? [];
     const totalCount = data.totalCount ?? items.length;
     const pageSize = query.pageSize ?? 12;
+    const pageIndex = data.pageNumber ?? data.pageIndex ?? query.pageNumber ?? query.pageIndex ?? 1;
+    const totalPages = data.totalPages ?? Math.max(1, Math.ceil(totalCount / pageSize));
     return {
-      pageIndex: data.pageIndex ?? query.pageIndex ?? 1,
-      totalPages: data.totalPages ?? Math.max(1, Math.ceil(totalCount / pageSize)),
+      pageIndex,
+      pageNumber: pageIndex,
+      pageSize: data.pageSize ?? pageSize,
+      totalPages,
       totalCount,
-      hasPreviousPage: data.hasPreviousPage ?? (data.pageIndex ?? 1) > 1,
-      hasNextPage: data.hasNextPage ?? (data.pageIndex ?? 1) < Math.max(1, Math.ceil(totalCount / pageSize)),
+      hasPreviousPage: data.hasPreviousPage ?? pageIndex > 1,
+      hasNextPage: data.hasNextPage ?? pageIndex < totalPages,
       items,
     };
   },

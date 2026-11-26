@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5f8fc" />
+    <title>TechStore | Logo Preview</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Plus Jakarta Sans", Inter, "Segoe UI", sans-serif;
+        color: #0f172a;
+        background: #f5f8fc;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-width: 320px;
+        margin: 0;
+        background:
+          radial-gradient(circle at 85% 4%, rgb(14 165 233 / 9%), transparent 25rem),
+          #f5f8fc;
+      }
+
+      main {
+        width: min(100% - 40px, 1040px);
+        margin: 0 auto;
+        padding: 64px 0;
+      }
+
+      .eyebrow {
+        margin: 0 0 12px;
+        color: #0369a1;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(32px, 5vw, 48px);
+        letter-spacing: -0.05em;
+      }
+
+      .intro {
+        max-width: 640px;
+        margin: 14px 0 32px;
+        color: #475569;
+        font-size: 16px;
+        line-height: 1.7;
+      }
+
+      .gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
+        gap: 20px;
+      }
+
+      .card {
+        overflow: hidden;
+        border: 1px solid #dbe5ef;
+        border-radius: 22px;
+        background: #fff;
+        box-shadow: 0 16px 40px -28px rgb(15 23 42 / 30%);
+      }
+
+      .card h2 {
+        margin: 0;
+        padding: 20px 22px 14px;
+        font-size: 14px;
+        letter-spacing: 0.02em;
+      }
+
+      .surface {
+        display: grid;
+        min-height: 150px;
+        place-items: center;
+        padding: 24px;
+      }
+
+      .surface-light {
+        background: linear-gradient(135deg, #fff, #f1f7fc);
+      }
+
+      .surface-dark {
+        background:
+          radial-gradient(circle at 70% 20%, rgb(14 165 233 / 28%), transparent 16rem),
+          #061b36;
+      }
+
+      .surface-mark {
+        min-height: 190px;
+      }
+
+      .surface img {
+        display: block;
+        width: min(100%, 360px);
+        height: auto;
+      }
+
+      .surface-mark img {
+        width: 104px;
+      }
+
+      .caption {
+        margin: 0;
+        padding: 0 22px 20px;
+        color: #64748b;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .palette {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        padding: 0 22px 22px;
+      }
+
+      .swatch {
+        display: flex;
+        min-height: 74px;
+        align-items: flex-end;
+        padding: 8px;
+        border-radius: 12px;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+
+      .navy { background: #061b36; }
+      .blue { background: #0369a1; }
+      .sky { background: #0ea5e9; color: #082f49; }
+      .silver { background: #e2e8f0; color: #334155; }
+
+      @media (max-width: 520px) {
+        main {
+          width: min(100% - 28px, 1040px);
+          padding: 40px 0;
+        }
+
+        .palette {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Brand identity · TechStore</p>
+      <h1>Công nghệ trong tầm tay</h1>
+      <p class="intro">
+        Logo hình học lấy cảm hứng từ khiên công nghệ và chữ T, dùng xanh navy,
+        xanh dương và ánh bạc để tạo cảm giác đáng tin cậy, hiện đại và cao cấp.
+      </p>
+
+      <section class="gallery" aria-label="Các cách sử dụng logo TechStore">
+        <article class="card">
+          <h2>Logo đầy đủ · Nền sáng</h2>
+          <div class="surface surface-light">
+            <img src="/techstore-logo.svg" alt="Logo TechStore — Công nghệ trong tầm tay" />
+          </div>
+          <p class="caption">Dùng cho tài liệu thương hiệu, trang giới thiệu và nền sáng.</p>
+        </article>
+
+        <article class="card">
+          <h2>Biểu tượng · Nền tối</h2>
+          <div class="surface surface-dark surface-mark">
+            <img src="/techstore-mark.svg" alt="Biểu tượng chữ T trong khiên công nghệ" />
+          </div>
+          <p class="caption">Biến thể biểu tượng dùng cho favicon, app icon và header xanh.</p>
+        </article>
+
+        <article class="card">
+          <h2>Bảng màu thương hiệu</h2>
+          <p class="caption">Tông màu được dùng xuyên suốt logo và banner.</p>
+          <div class="palette" aria-label="Màu thương hiệu">
+            <div class="swatch navy">Navy · #061B36</div>
+            <div class="swatch blue">Blue · #0369A1</div>
+            <div class="swatch sky">Sky · #0EA5E9</div>
+            <div class="swatch silver">Silver · #E2E8F0</div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

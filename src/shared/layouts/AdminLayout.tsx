@@ -7,7 +7,6 @@ import {
   ChevronRight,
   CreditCard,
   FolderTree,
-  LayoutGrid,
   LogOut,
   Menu,
   Package,
@@ -166,9 +165,7 @@ export function AdminLayout() {
     <aside className="flex h-full w-[245px] shrink-0 flex-col border-r border-slate-200 bg-white">
       <div className="flex h-[68px] items-center border-b border-slate-100 px-5">
         <Link to="/" className="flex items-center gap-3" aria-label="TechStore - Về cửa hàng">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
-            <LayoutGrid className="h-[18px] w-[18px]" aria-hidden="true" />
-          </span>
+          <img src="/techstore-mark.svg" alt="" className="h-9 w-9" />
           <span>
             <strong className="block text-[17px] leading-none text-slate-900">TechStore</strong>
             <span className="mt-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Admin Center</span>

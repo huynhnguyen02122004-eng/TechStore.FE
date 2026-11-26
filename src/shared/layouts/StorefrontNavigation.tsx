@@ -98,9 +98,12 @@ export function StorefrontNavigation() {
           <button type="button" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#1556bd] shadow-sm" aria-label="Mở danh mục">
             <Menu className="h-5 w-5" />
           </button>
-          <Link to="/" className="shrink-0 text-[19px] font-black italic leading-none tracking-tight sm:text-[24px]" aria-label="TechStore - Trang chủ">
+          <Link to="/" className="flex shrink-0 items-center gap-2 text-[19px] font-black leading-none tracking-tight sm:text-[24px]" aria-label="TechStore - Trang chủ">
+            <img src="/techstore-mark.svg" alt="" className="h-10 w-10" />
+            <span>
             <span className="block">TechStore</span>
-            <span className="mt-1 block text-center text-[8px] font-bold uppercase not-italic tracking-[0.3em]">tech for everyone</span>
+            <span className="mt-1 block text-[8px] font-bold uppercase tracking-[0.2em] text-blue-100">công nghệ trong tầm tay</span>
+            </span>
           </Link>
 
           <form onSubmit={submitHeaderSearch} className="relative mx-auto w-full max-w-[440px]">
@@ -150,14 +153,10 @@ export function StorefrontNavigation() {
       <div className="border-b border-slate-200/80 bg-[#0f56bd]">
         <div className="mx-auto grid min-h-[74px] max-w-7xl grid-cols-[150px_minmax(0,1fr)_auto] items-center gap-2 px-3 sm:grid-cols-[180px_minmax(0,1fr)_auto_auto] sm:gap-4 sm:px-6 lg:px-8">
           <Link to="/" className="flex items-center gap-2.5 text-white" aria-label="TechStore - Trang chủ">
-            <div className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-white shadow-md">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#1b63c6]">
-                <ChevronDown className="h-4 w-4 -rotate-90 text-white" />
-              </div>
-            </div>
+            <img src="/techstore-mark.svg" alt="" className="h-11 w-11 drop-shadow-md" />
             <div>
               <span className="block text-[20px] font-extrabold leading-none tracking-tight">TechStore</span>
-              <span className="mt-1 block text-[8px] font-bold uppercase tracking-[0.28em] text-blue-100">Tech for everyone</span>
+              <span className="mt-1 block text-[8px] font-bold uppercase tracking-[0.2em] text-blue-100">Công nghệ trong tầm tay</span>
             </div>
           </Link>
 
